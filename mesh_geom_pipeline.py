@@ -68,8 +68,86 @@ def clean_mesh(mesh: o3d.geometry.TriangleMesh) -> o3d.geometry.TriangleMesh:
     mesh = mesh.remove_degenerate_triangles()
     mesh = mesh.remove_non_manifold_edges()
     mesh = mesh.remove_unreferenced_vertices()
+    mesh.triangle_normals = o3d.utility.Vector3dVector()
     mesh.compute_vertex_normals()
     return mesh
+
+def align_mesh(
+    mesh: o3d.geometry.TriangleMesh,
+    center_mode: str = "bbox",
+    align_axes: bool = True,
+) -> o3d.geometry.TriangleMesh:
+    """
+    Put the mesh in a common coordinate frame:
+      - subtract a common center (bounding-box center or centroid)
+      - align principal axes via PCA
+    Does *not* change physical scale.
+    """
+    V = np.asarray(mesh.vertices)
+    if V.size == 0:
+        return mesh
+
+    # 1) Centering
+    if center_mode == "centroid":
+        center = V.mean(axis=0)
+    else:
+        vmin = V.min(axis=0)
+        vmax = V.max(axis=0)
+        center = 0.5 * (vmin + vmax)
+    V_centered = V - center
+
+    if not align_axes:
+        mesh.vertices = o3d.utility.Vector3dVector(V_centered.astype(np.float64))
+        mesh.compute_vertex_normals()
+        return mesh
+
+    # 2) PCA-based orientation (principal axes)
+    cov = np.cov(V_centered.T)
+    eigvals, eigvecs = np.linalg.eigh(cov)
+    # sort by descending variance
+    order = np.argsort(eigvals)[::-1]
+    R = eigvecs[:, order]
+
+    # enforce right-handed, consistent orientation
+    if np.linalg.det(R) < 0:
+        R[:, 0] *= -1
+
+    V_aligned = V_centered @ R
+    mesh.vertices = o3d.utility.Vector3dVector(V_aligned.astype(np.float64))
+    mesh.compute_vertex_normals()
+    return mesh
+
+
+def mesh_to_pointcloud(
+    mesh: o3d.geometry.TriangleMesh,
+    n_points: int,
+    method: str = "poisson",
+) -> np.ndarray:
+    """
+    Sample exactly n_points from the mesh surface.
+
+    Returns:
+        (n_points, 3) float32 array.
+    """
+    if n_points <= 0:
+        raise ValueError("n_points must be > 0")
+
+    mesh = clean_mesh(mesh)
+    if method == "poisson":
+        pcd = mesh.sample_points_poisson_disk(number_of_points=n_points)
+    else:
+        pcd = mesh.sample_points_uniformly(number_of_points=n_points)
+
+    pts = np.asarray(pcd.points, dtype=np.float32)
+
+    # Ensure exactly n_points (pad or truncate)
+    if pts.shape[0] < n_points:
+        pad = np.zeros((n_points - pts.shape[0], 3), dtype=np.float32)
+        pts = np.concatenate([pts, pad], axis=0)
+    elif pts.shape[0] > n_points:
+        pts = pts[:n_points]
+
+    return pts
 
 
 # --------------------------
@@ -174,6 +252,7 @@ def preprocess_obj_folder(
     out_root: str | Path,
     target_tris: int = 20000,
     save_npz: bool = True,
+    n_points: int | None = None,
 ) -> Tuple[List[o3d.geometry.TriangleMesh], List[str]]:
     """
     Preprocess a folder (or single .obj) into simplified meshes + optional
@@ -195,6 +274,7 @@ def preprocess_obj_folder(
 
     simplified_meshes: List[o3d.geometry.TriangleMesh] = []
     names: List[str] = []
+    points_list: List[np.ndarray] = []
 
     print(f"[PREPROC] Found {len(obj_files)} OBJ files")
 
@@ -205,10 +285,19 @@ def preprocess_obj_folder(
             print("  -> EMPTY, skipped.")
             continue
         mesh = clean_mesh(mesh)
-        s0 = mesh_stats_o3d(mesh)
-        print(f"  original: V={s0['num_vertices']} F={s0['num_triangles']} E={s0['num_edges']}")
 
+        # 🔹 Align patient body: same center + orientation for all
+        mesh = align_mesh(mesh, center_mode="bbox", align_axes=True)
+
+        s0 = mesh_stats_o3d(mesh)
+        print(f"  original (aligned): V={s0['num_vertices']} F={s0['num_triangles']} E={s0['num_edges']}")
+
+        # 🔹 Fixed-detail simplification (same target_tris for everyone)
         simp = simplify_mesh(mesh, target_tris=target_tris)
+        if n_points is not None and n_points > 0:
+            pc = mesh_to_pointcloud(simp, n_points=n_points)
+            points_list.append(pc)
+
         s1 = mesh_stats_o3d(simp)
         print(f"  simplified: V={s1['num_vertices']} F={s1['num_triangles']} E={s1['num_edges']}")
 
@@ -224,15 +313,20 @@ def preprocess_obj_folder(
     if save_npz and simplified_meshes:
         batch = meshes_to_padded_tensors(simplified_meshes)
         out_npz = out_root / "simplified_padded_tensors.npz"
-        np.savez_compressed(
-            out_npz,
-            verts=batch["verts"].numpy(),
-            verts_mask=batch["verts_mask"].numpy(),
-            faces=batch["faces"].numpy(),
-            faces_mask=batch["faces_mask"].numpy(),
-            names=np.array(names, dtype=object),
-        )
+
+        npz_kwargs = {
+            "verts": batch["verts"].numpy(),
+            "verts_mask": batch["verts_mask"].numpy(),
+            "faces": batch["faces"].numpy(),
+            "faces_mask": batch["faces_mask"].numpy(),
+            "names": np.array(names, dtype=object),
+        }
+        if points_list:
+            npz_kwargs["points"] = np.stack(points_list, axis=0)  # (B, n_points, 3)
+
+        np.savez_compressed(out_npz, **npz_kwargs)
         print(f"\n[PREPROC] Saved padded tensor batch -> {out_npz}")
+
 
     return simplified_meshes, names
 
