@@ -43,6 +43,7 @@ from mesh_geom_pipeline import (
     meshes_to_padded_tensors,
     tensors_to_meshes,
     clean_mesh,
+    preprocess_obj_folder,
 )
 
 from mesh_vae import MeshVAEModel
@@ -64,6 +65,16 @@ class BaseOptions:
 
         parser.add_argument("--gpu_ids", type=str, default="0")
         parser.add_argument("--phase", type=str, default="train")
+
+        # Preprocessing / geometry
+        parser.add_argument("--target_tris", type=int, default=20000,
+                            help="Target number of triangles per simplified mesh (offline preprocessing).")
+        parser.add_argument("--n_points", type=int, default=0,
+                            help="If > 0, also precompute point clouds with this many points per mesh.")
+        parser.add_argument("--use_preprocessed", action="store_true",
+                            help="Load meshes from simplified_padded_tensors.npz instead of raw OBJs.")
+        parser.add_argument("--use_pointcloud", action="store_true",
+                            help="Use precomputed point clouds as input features instead of mesh vertices.")
 
         parser.add_argument("--arch", type=str, default="meshvae")
         parser.add_argument("--pool_mode", type=str, default="skip")
@@ -165,7 +176,7 @@ class MeshVAEDataset(Dataset):
 
         # 1) Clean and simplify
         mesh = clean_mesh(mesh)
-        simp = simplify_mesh(mesh, target_tris=None, ratio=0.02)
+        simp = simplify_mesh(mesh, target_tris=None, ratio=1.0)
 
         # 2) Convert Open3D → Trimesh for model use
         V = np.asarray(simp.vertices, dtype=np.float64)
@@ -189,6 +200,87 @@ class MeshVAEDataset(Dataset):
 
         return data
 
+class PreprocessedMeshVAEDataset(Dataset):
+    """
+    Loads meshes from the offline-preprocessed NPZ:
+      simplified_padded_tensors.npz
+
+    - verts: (B, Vmax, 3)
+    - verts_mask: (B, Vmax)
+    - faces: (B, Fmax, 3)
+    - faces_mask: (B, Fmax)
+    - names: (B,)
+    - points: (B, n_points, 3)  [optional, for point-cloud input]
+    """
+    def __init__(self, folder, opt):
+        super().__init__()
+        self.opt = opt
+        root = Path(folder)
+        npz_path = root / "simplified_padded_tensors.npz"
+        if not npz_path.exists():
+            raise FileNotFoundError(f"Preprocessed NPZ not found at {npz_path}. "
+                                    f"Run with --phase preprocess first.")
+
+        self.data = np.load(npz_path, allow_pickle=True)
+        self.verts = self.data["verts"].astype(np.float32)        # (B, Vmax, 3)
+        self.verts_mask = self.data["verts_mask"].astype(bool)    # (B, Vmax)
+        self.faces = self.data["faces"].astype(np.int64)          # (B, Fmax, 3)
+        self.faces_mask = self.data["faces_mask"].astype(bool)    # (B, Fmax)
+        self.names = self.data["names"]
+        self.points = self.data["points"].astype(np.float32) if "points" in self.data.files else None
+
+        print(f"[DATA] Loaded preprocessed NPZ: {npz_path}")
+        print(f"[DATA]   meshes={self.verts.shape[0]}, Vmax={self.verts.shape[1]}, Fmax={self.faces.shape[1]}")
+
+    def __len__(self):
+        return self.verts.shape[0]
+
+    def __getitem__(self, idx):
+        V_pad = self.verts[idx]         # (Vmax, 3)
+        V_mask = self.verts_mask[idx]   # (Vmax,)
+        F_pad = self.faces[idx]         # (Fmax, 3)
+        F_mask = self.faces_mask[idx]   # (Fmax,)
+
+        # Unpadded geometry
+        V = V_pad[V_mask]               # (V_real, 3)
+        F = F_pad[F_mask]               # (F_real, 3)
+
+        # Trimesh for the VAE (even though pool_mode=skip currently)
+        tri = trimesh.Trimesh(vertices=V.astype(np.float64),
+                              faces=F.astype(np.int64),
+                              process=False)
+
+        # Choose representation for edge_features:
+        #  - vertices (default) or
+        #  - point cloud (if use_pointcloud + points present)
+        if getattr(self.opt, "use_pointcloud", False) and (self.points is not None):
+            P = self.points[idx].astype(np.float32)   # (n_points, 3)
+            feats_np = P.T                            # (3, n_points)
+        else:
+            feats_np = V.astype(np.float32).T         # (3, V_real)
+
+        edge_features = torch.from_numpy(feats_np).unsqueeze(0)    # (1, 3, E)
+
+        # Rebuild simple Open3D mesh from simplified geometry (for stats / redetail)
+        import open3d as o3d
+        simp_mesh = o3d.geometry.TriangleMesh(
+            vertices=o3d.utility.Vector3dVector(V.astype(np.float64)),
+            triangles=o3d.utility.Vector3iVector(F.astype(np.int64)),
+        )
+        simp_mesh = clean_mesh(simp_mesh)
+
+        data = {
+            "path": str(self.names[idx]),
+            "simplified": simp_mesh,            # Open3D mesh, collate -> [simp_mesh]
+            "verts": torch.from_numpy(V_pad),   # padded
+            "faces": torch.from_numpy(F_pad),
+            "verts_mask": torch.from_numpy(V_mask),
+            "faces_mask": torch.from_numpy(F_mask),
+            "mesh": [tri],                      # list of Trimesh (what the model expects)
+            "edge_features": edge_features,     # (1, 3, E)
+        }
+        return data
+
 
 def mesh_collate_fn(batch):
     out = {}
@@ -197,18 +289,15 @@ def mesh_collate_fn(batch):
         vals = [b[k] for b in batch]
         v0 = vals[0]
         if isinstance(v0, torch.Tensor):
-            # avoid adding an extra dimension for edge_features
-            if k == "edge_features" and v0.ndim == 2:
-                # (C, E) → (B, C, E)
-                out[k] = torch.stack(vals, dim=0)
-            elif k == "edge_features" and v0.ndim == 3:
-                # already (1, C, E), just concatenate
+            if k == "edge_features":
+                # vals[i]: (1, C, E) → out: (B, C, E)
                 out[k] = torch.cat(vals, dim=0)
             else:
                 out[k] = torch.stack(vals, dim=0)
         else:
             out[k] = vals
     return out
+
 
 
 # =========================================
@@ -233,27 +322,6 @@ def split_dataset(dataset, ratio, seed):
 # Redetailing
 # =========================================
 
-# def redetail_to_original_edges(mesh_recon, mesh_original):
-#     """
-#     Increase triangle count until reconstructed mesh roughly
-#     matches the original edge count.
-#     """
-#     m = mesh_recon
-#     target_edges = mesh_stats_o3d(mesh_original)["num_edges"]
-#     print(f"[REDETAIL] Target edges = {target_edges}")
-
-#     prev_edges = -1
-#     for i in range(8):
-#         cur_edges = mesh_stats_o3d(m)["num_edges"]
-#         print(f"[REDETAIL] step {i}: edges={cur_edges}")
-#         if cur_edges >= target_edges or cur_edges == prev_edges:
-#             break
-#         prev_edges = cur_edges
-
-#         m = m.subdivide_midpoint(number_of_iterations=1)
-#         m = clean_mesh(m)
-
-#     return m
 def redetail_to_simplified_edges(
     mesh_recon,
     mesh_simplified,
@@ -303,7 +371,12 @@ def redetail_to_simplified_edges(
 def train(opt):
     print("\n========== TRAIN: MeshVAE ==========\n")
 
-    dataset = MeshVAEDataset(opt.dataroot, opt)
+    #dataset = MeshVAEDataset(opt.dataroot, opt)
+    if getattr(opt, "use_preprocessed", False):
+        dataset = PreprocessedMeshVAEDataset(opt.dataroot, opt)
+    else:
+        dataset = MeshVAEDataset(opt.dataroot, opt)
+
     train_data, val_data = split_dataset(dataset, opt.split_ratio, opt.split_seed)
 
     train_loader = DataLoader(
@@ -344,142 +417,6 @@ def train(opt):
 # Testing / reconstruction
 # =========================================
 
-# def run_test(opt, model, val_subset):
-#     print("\n========== TESTING ==========\n")
-
-#     loader = DataLoader(
-#         val_subset,
-#         batch_size=1,
-#         shuffle=False,
-#         num_workers=0,
-#         collate_fn=mesh_collate_fn,
-#     )
-
-#     save_root = Path(opt.checkpoints_dir) / opt.name / "reconstructions"
-#     save_root.mkdir(parents=True, exist_ok=True)
-
-#     for i, data in enumerate(loader):
-#         model.set_input(data)
-#         out = model.test()
-
-#         # B=1 here
-#         orig_mesh = data["original"][0]
-#         simp_mesh = data["simplified"][0]
-
-#         # x_mean: (B, C, E)
-#         x_mean = out["x_mean"]          # (1, C, E)
-
-#         # Build batch for tensors_to_meshes
-#         batch = {
-#             "verts": x_mean.permute(0, 2, 1),   # (1, E, C)
-#             "verts_mask": data["verts_mask"],   # (1, V)
-#             "faces": data["faces"],             # (1, F, 3)
-#             "faces_mask": data["faces_mask"],   # (1, F)
-#         }
-
-#         recon_mesh = tensors_to_meshes(batch)[0]
-
-#         # Redetail to original resolution
-#         recon_detail = redetail_to_original_edges(recon_mesh, orig_mesh)
-
-#         import open3d as o3d
-
-#         out_path = save_root / f"recon_{i}.obj"
-#         out_path2 = save_root / f"recon_{i}_redetail.obj"
-#         o3d.io.write_triangle_mesh(str(out_path), recon_mesh)
-#         o3d.io.write_triangle_mesh(str(out_path2), recon_detail)
-
-#         print(f"[TEST] Saved {out_path}")
-#         print(f"[TEST] Saved {out_path2}")
-
-# def run_test(opt, model, val_subset):
-#     print("\n========== TESTING ==========\n")
-
-#     loader = DataLoader(
-#         val_subset,
-#         batch_size=1,
-#         shuffle=False,
-#         num_workers=0,
-#         collate_fn=mesh_collate_fn,   # keep your custom collate
-#     )
-
-#     save_root = Path(opt.checkpoints_dir) / opt.name / "reconstructions"
-#     save_root.mkdir(parents=True, exist_ok=True)
-
-#     import open3d as o3d
-#     # Silence info spam; warning about normals will still show once
-#     o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Warning)
-
-#     for i, data in enumerate(loader):
-#         print(f"\n[TEST] ==== sample {i} ====", flush=True)
-
-#         # 1) Forward pass
-#         print("[TEST] setting input...", flush=True)
-#         model.set_input(data)
-#         print("[TEST] running model.test()...", flush=True)
-#         out = model.test()
-#         print("[TEST] forward pass done.", flush=True)
-
-#         # 2) original + simplified meshes from dataset
-#         orig_mesh = data["original"][0]      # Open3D TriangleMesh
-#         simp_mesh = data["simplified"][0]    # Open3D TriangleMesh
-
-#         orig_path = save_root / f"original_{i}.obj"
-#         simp_path = save_root / f"simplified_{i}.obj"
-
-#         # Only write these once (they don't change between epochs)
-#         if not orig_path.exists():
-#             print(f"[TEST] writing original mesh -> {orig_path}", flush=True)
-#             o3d.io.write_triangle_mesh(str(orig_path), orig_mesh)
-#         else:
-#             print(f"[TEST] original mesh already exists -> {orig_path}", flush=True)
-
-#         if not simp_path.exists():
-#             print(f"[TEST] writing simplified mesh -> {simp_path}", flush=True)
-#             o3d.io.write_triangle_mesh(str(simp_path), simp_mesh)
-#         else:
-#             print(f"[TEST] simplified mesh already exists -> {simp_path}", flush=True)
-
-#         # 3) reconstruction from VAE output (x_mean: (B, C, E), B=1)
-#         x_mean = out["x_mean"]  # (1, C, E)
-#         print(f"[TEST] x_mean shape = {tuple(x_mean.shape)}", flush=True)
-
-#         # Build batch dict expected by tensors_to_meshes()
-#         batch = {
-#             "verts": x_mean.permute(0, 2, 1),     # (1, E, C)
-#             "verts_mask": data["verts_mask"],     # (1, V)
-#             "faces": data["faces"],               # (1, F, 3)
-#             "faces_mask": data["faces_mask"],     # (1, F)
-#         }
-
-#         print("[TEST] converting tensors -> recon mesh", flush=True)
-#         recon_mesh = tensors_to_meshes(batch)[0]
-#         recon_stats = mesh_stats_o3d(recon_mesh)
-#         print(f"[TEST] recon mesh: V={recon_stats['num_vertices']}, "
-#               f"F={recon_stats['num_triangles']}, "
-#               f"E={recon_stats['num_edges']}", flush=True)
-
-#         # 4) re-detail recon to match original edge scale (clamped)
-#         print("[TEST] starting redetail_to_original_edges()", flush=True)
-#         recon_detail = redetail_to_original_edges(recon_mesh, orig_mesh)
-#         detail_stats = mesh_stats_o3d(recon_detail)
-#         print(f"[TEST] recon_redetail mesh: V={detail_stats['num_vertices']}, "
-#               f"F={detail_stats['num_triangles']}, "
-#               f"E={detail_stats['num_edges']}", flush=True)
-
-#         # 5) Save both recon meshes
-#         recon_path = save_root / f"recon_{i}.obj"
-#         recon_redetail_path = save_root / f"recon_{i}_redetail.obj"
-
-#         print(f"[TEST] writing recon mesh -> {recon_path}", flush=True)
-#         o3d.io.write_triangle_mesh(str(recon_path), recon_mesh)
-
-#         print(f"[TEST] writing recon_redetail mesh -> {recon_redetail_path}", flush=True)
-#         o3d.io.write_triangle_mesh(str(recon_redetail_path), recon_detail)
-
-#         print(f"[TEST] DONE sample {i}", flush=True)
-
-
 def run_test(opt, model, val_subset):
     print("\n========== TESTING ==========\n")
 
@@ -498,77 +435,67 @@ def run_test(opt, model, val_subset):
     o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Warning)
 
     for i, data in enumerate(loader):
-        # -------------------------------------------------
-        # Identify which file this sample corresponds to
-        # -------------------------------------------------
         sample_path = Path(data["path"][0])
-        base_name = sample_path.stem  # e.g. "Scan_aug_000"
+        base_name = sample_path.stem  # e.g. "Scan_aug_010"
 
         print(f"\n[TEST] sample {i}")
         print(f"       source path : {sample_path}")
         print(f"       base name   : {base_name}")
 
         # -------------------------------------------------
-        # Forward pass
+        # Forward pass through VAE
         # -------------------------------------------------
         model.set_input(data)
         out = model.test()
 
-        # -------------------------------------------------
-        # 1) simplified mesh (Open3D) – save it
-        # -------------------------------------------------
-        simp_mesh = data["simplified"][0]
-        simp_stats = mesh_stats_o3d(simp_mesh)
-        print(
-            f"[TEST] simplified V={simp_stats['num_vertices']} "
-            f"F={simp_stats['num_triangles']} E={simp_stats['num_edges']}"
-        )
-
-        simp_path = save_root / f"{base_name}_simplified.obj"
-        o3d.io.write_triangle_mesh(str(simp_path), simp_mesh)
-        print(f"[TEST] wrote simplified -> {simp_path.name}")
-
-        # -------------------------------------------------
-        # 2) reconstruction from VAE output
-        # -------------------------------------------------
-        x_mean = out["x_mean"]  # (1, C, E)
+        x = out["x"][0]        # (C, E)
+        x_mean = out["x_mean"][0]  # (C, E)
+        print(f"[TEST] x shape      = {tuple(x.shape)}")
         print(f"[TEST] x_mean shape = {tuple(x_mean.shape)}")
 
+        # -------------------------------------------------
+        # POINT CLOUD MODE: save original + recon as .ply
+        # -------------------------------------------------
+        if getattr(opt, "use_pointcloud", False):
+            # original point cloud
+            pc_orig = x.permute(1, 0).cpu().numpy()      # (N, 3)
+            pcd_orig = o3d.geometry.PointCloud()
+            pcd_orig.points = o3d.utility.Vector3dVector(pc_orig.astype(np.float64))
+            orig_path = save_root / f"{base_name}_orig_points.ply"
+            o3d.io.write_point_cloud(str(orig_path), pcd_orig)
+            print(f"[TEST] wrote original point cloud -> {orig_path.name}")
+
+            # reconstructed point cloud
+            pc_recon = x_mean.permute(1, 0).cpu().numpy()  # (N, 3)
+            pcd_recon = o3d.geometry.PointCloud()
+            pcd_recon.points = o3d.utility.Vector3dVector(pc_recon.astype(np.float64))
+            recon_path = save_root / f"{base_name}_recon_points.ply"
+            o3d.io.write_point_cloud(str(recon_path), pcd_recon)
+            print(f"[TEST] wrote recon point cloud    -> {recon_path.name}")
+
+            # done for this sample
+            continue
+
+        # -------------------------------------------------
+        # MESH MODE: save simplified input mesh + recon mesh
+        # -------------------------------------------------
+        # 1) input mesh (simplified)
+        simp_mesh = data["simplified"][0]
+        simp_path = save_root / f"{base_name}_input_mesh.obj"
+        o3d.io.write_triangle_mesh(str(simp_path), simp_mesh)
+        print(f"[TEST] wrote input mesh -> {simp_path.name}")
+
+        # 2) reconstructed mesh from x_mean using stored faces/mask
         batch = {
-            "verts": x_mean.permute(0, 2, 1),   # (1, E, C)
-            "verts_mask": data["verts_mask"],   # (1, V)
-            "faces": data["faces"],             # (1, F, 3)
-            "faces_mask": data["faces_mask"],   # (1, F)
+            "verts": out["x_mean"].permute(0, 2, 1),  # (1, E, C)
+            "verts_mask": data["verts_mask"],         # (1, V)
+            "faces": data["faces"],                   # (1, F, 3)
+            "faces_mask": data["faces_mask"],         # (1, F)
         }
-
         recon_mesh = tensors_to_meshes(batch)[0]
-        recon_stats = mesh_stats_o3d(recon_mesh)
-        print(
-            f"[TEST] recon      V={recon_stats['num_vertices']} "
-            f"F={recon_stats['num_triangles']} E={recon_stats['num_edges']}"
-        )
-
-        # -------------------------------------------------
-        # 3) re-detail recon to match simplified resolution
-        # -------------------------------------------------
-        recon_detail = redetail_to_simplified_edges(recon_mesh, simp_mesh)
-        detail_stats = mesh_stats_o3d(recon_detail)
-        print(
-            f"[TEST] recon_redetail V={detail_stats['num_vertices']} "
-            f"F={detail_stats['num_triangles']} E={detail_stats['num_edges']}"
-        )
-
-        # -------------------------------------------------
-        # 4) Save recon + recon_redetail
-        # -------------------------------------------------
-        recon_path = save_root / f"{base_name}_recon.obj"
-        recon_redetail_path = save_root / f"{base_name}_recon_redetail.obj"
-
+        recon_path = save_root / f"{base_name}_recon_mesh.obj"
         o3d.io.write_triangle_mesh(str(recon_path), recon_mesh)
-        o3d.io.write_triangle_mesh(str(recon_redetail_path), recon_detail)
-
-        print(f"[TEST] wrote recon          -> {recon_path.name}")
-        print(f"[TEST] wrote recon_redetail -> {recon_redetail_path.name}")
+        print(f"[TEST] wrote recon mesh -> {recon_path.name}")
 
 
 # =========================================
@@ -580,12 +507,32 @@ if __name__ == "__main__":
 
     os.makedirs(Path(opt.checkpoints_dir) / opt.name, exist_ok=True)
 
-    if opt.phase == "train":
+    if opt.phase == "preprocess":
+        # 🔹 Offline preprocessing only – no training
+        n_points = opt.n_points if getattr(opt, "n_points", 0) > 0 else None
+        print("\n========== PREPROCESS (offline) ==========\n")
+        preprocess_obj_folder(
+            input_root=opt.dataroot,
+            out_root=opt.dataroot,
+            target_tris=opt.target_tris,
+            save_npz=True,
+            n_points=n_points,
+        )
+        print("\nPreprocessing complete. You can now run with --use_preprocessed.\n")
+
+    elif opt.phase == "train":
         opt.is_train = True
         train(opt)
 
     elif opt.phase == "test":
         opt.is_train = False
         model = MeshVAEModel(opt)
+        dataset = PreprocessedMeshVAEDataset(opt.dataroot, opt) if getattr(opt, "use_preprocessed", False) \
+                  else MeshVAEDataset(opt.dataroot, opt)
         model.load_network("latest")
-        run_test(opt, model, MeshVAEDataset(opt.dataroot, opt))
+        run_test(opt, model, dataset)
+
+
+
+
+
