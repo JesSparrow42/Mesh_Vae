@@ -1,6 +1,6 @@
 # Supervised Diagnostic Model
 
-Run the commands in this guide from the repository root.
+> **Historical interface:** `train_diagnostic_model.py` and `diagnose_diagnostic_model.py` are not included in this checkout. The examples below document an earlier workflow and cannot be run as written. For the available VAE evaluation workflow, use `python -m scripts.diagnostics.diagnose_mesh_vae --help` and the [model-comparison guide](README_MODEL_COMPARISON.md).
 
 This is the fresh direct classifier path. It predicts the binary
 atherosclerosis target directly from either body-scan point clouds or

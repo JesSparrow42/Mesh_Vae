@@ -70,7 +70,7 @@ nvidia-smi
 "$PYTHON" -c "import sys, torch, numpy, pandas, scipy, sklearn, trimesh, open3d, matplotlib; assert sys.version_info[:2] == (3, 11); assert torch.cuda.is_available(); print('[ENV] ALL REQUIRED IMPORTS WORK'); print('[ENV] GPU', torch.cuda.get_device_name(0))"
 
 echo "========== BUILD TARGET-ENRICHED SPLITS =========="
-"$PYTHON" run_cardiovascular_target_benchmark.py \
+"$PYTHON" scripts/benchmarks/run_cardiovascular_target_benchmark.py \
   --name_prefix "$PREP_NAME" \
   --dataroot "$DATA_ROOT" \
   --metadata_tsv "$METADATA" \
@@ -88,7 +88,7 @@ echo "========== TRAIN SCAN-ONLY ENCODER =========="
 # The encoder receives no age, BMI, sex, or disease condition. The plaque head
 # is supervised using training labels, while the held-out test remains untouched.
 # Open3D TriangleMesh objects are not pickleable, so num_threads must remain 0.
-"$PYTHON" train_mesh_vae.py \
+"$PYTHON" scripts/training/train_mesh_vae.py \
   --phase train \
   --name "$RUN_NAME" \
   --checkpoints_dir "$CHECKPOINT_ROOT" \
@@ -135,7 +135,7 @@ echo "========== TRAIN SCAN-ONLY ENCODER =========="
   --no-balance_athero
 
 echo "========== HELD-OUT TEST =========="
-"$PYTHON" diagnose_mesh_binary.py \
+"$PYTHON" scripts/diagnostics/diagnose_mesh_binary.py \
   --name "$RUN_NAME" \
   --checkpoints_dir "$CHECKPOINT_ROOT" \
   --dataroot "$DATA_ROOT" \

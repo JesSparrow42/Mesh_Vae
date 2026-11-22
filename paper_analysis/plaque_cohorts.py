@@ -7,7 +7,7 @@ import pandas as pd
 
 from meshvae.conditioning import clean_stregkode
 from meshvae.scan_geometry import load_aligned_scan_geometry
-from run_cardiovascular_target_benchmark import _read_table, _id_column, _resolve_column, _numeric
+from scripts.benchmarks.run_cardiovascular_target_benchmark import _read_table, _id_column, _resolve_column, _numeric
 
 TERRITORIES = ("carotid_right", "carotid_left", "carotid_total", "femoral_right",
                "femoral_left", "femoral_total", "coronary_volume")

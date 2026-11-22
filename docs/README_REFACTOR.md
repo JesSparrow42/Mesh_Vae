@@ -2,7 +2,7 @@
 
 Run the commands in this guide from the repository root.
 
-This folder keeps the old command names (`train_mesh_vae.py`, `mesh_vae.py`, `mesh_geom_pipeline.py`, `diagnose_mesh_vae.py`) but moves most helper code into the `meshvae/` package.
+The model implementation lives in `meshvae/`. Training and diagnostic entry points are grouped under `scripts/`; earlier import adapters live in `meshvae/compat/`. Use `python -m scripts.training.train_mesh_vae` and `python -m scripts.diagnostics.diagnose_mesh_vae` from the repository root.
 
 ## Main changes
 
@@ -33,7 +33,7 @@ A bug in the old `build_age_gender_lookup()` path was fixed: gender is now actua
 Enable it with:
 
 ```bash
-python train_mesh_vae.py   --phase train   --use_cond   --encoder_use_cond   --use_cond_prior   --adv_predict_age   --adv_age_weight 0.2   --adv_age_grl_lambda 1.0   ...your existing args...
+python -m scripts.training.train_mesh_vae   --phase train   --use_cond   --encoder_use_cond   --use_cond_prior   --adv_predict_age   --adv_age_weight 0.2   --adv_age_grl_lambda 1.0   ...your existing args...
 ```
 
 The decoder still receives age as a normal conditional VAE input, but the latent `mu(X)` is passed through a gradient-reversal age classifier. The classifier tries to predict the age bin, while the encoder receives the opposite gradient and is discouraged from storing age in the latent representation.
@@ -48,7 +48,7 @@ For 4 age bins, chance accuracy is about `0.25`. If `age_adv_acc` is very high, 
 ## Recommended first run
 
 ```bash
-python train_mesh_vae.py   --dataroot ./data   --name REACT_vae_age_adv   --phase train   --use_preprocessed   --use_pointcloud   --use_cond   --encoder_use_cond   --use_cond_prior   --cond_tsv cohort.tsv   --cond_athero   --cond_athero_mode 4bit   --adv_predict_age   --adv_age_weight 0.2   --adv_age_grl_lambda 1.0   --ncf 64 128 256   --latent_dim 64   --ninput_edges 10000
+python -m scripts.training.train_mesh_vae   --dataroot ./data   --name REACT_vae_age_adv   --phase train   --use_preprocessed   --use_pointcloud   --use_cond   --encoder_use_cond   --use_cond_prior   --cond_tsv cohort.tsv   --cond_athero   --cond_athero_mode 4bit   --adv_predict_age   --adv_age_weight 0.2   --adv_age_grl_lambda 1.0   --ncf 64 128 256   --latent_dim 64   --ninput_edges 10000
 ```
 
 If reconstruction gets worse, reduce `--adv_age_weight` to `0.05` or turn off `--encoder_use_cond` while keeping decoder conditioning.

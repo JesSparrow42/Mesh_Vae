@@ -1,0 +1,12 @@
+# Keep active text files consistent when a checkout is shared by Windows and WSL.
+* text=auto eol=lf
+
+# Historical snapshots retain their original bytes and line endings.
+/archive/** -text
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.zip binary
+*.whl binary

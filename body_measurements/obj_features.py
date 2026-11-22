@@ -9,7 +9,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from build_scan_geometry_features import FEATURE_NAMES, parse_obj_vertices
+from scripts.preprocessing.build_scan_geometry_features import FEATURE_NAMES, parse_obj_vertices
 from .data import clean_id
 
 

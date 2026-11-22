@@ -319,7 +319,7 @@ def training_command(reference, name, paths, group, variant, checkpoints, root=R
         o.pop('--only_gender', None)
     else:
         set_value(o, 'only_gender', group)
-    command = [sys.executable, str(Path(root) / 'train_mesh_vae.py')]
+    command = [sys.executable, str(Path(root) / 'scripts' / 'training' / 'train_mesh_vae.py')]
     for key, values in o.items():
         command.extend([key, *values])
     return command
@@ -327,7 +327,7 @@ def training_command(reference, name, paths, group, variant, checkpoints, root=R
 
 def evaluation_command(train_command, test_path, root=ROOT):
     o = command_options(train_command)
-    command = [sys.executable, str(Path(root) / 'diagnose_mesh_binary.py')]
+    command = [sys.executable, str(Path(root) / 'scripts' / 'diagnostics' / 'diagnose_mesh_binary.py')]
     for key in ('name', 'checkpoints_dir', 'dataroot', 'only_gender', 'seed', 'batch_size',
                 'cond_stregkode_col', 'cond_age_col', 'cond_gender_col'):
         if '--' + key in o:

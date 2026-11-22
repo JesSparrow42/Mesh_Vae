@@ -2,6 +2,8 @@
 
 Run the commands in this guide from the repository root.
 
+> **Historical experiment template:** the retained `scripts/benchmarks/run_full_meshvae_regression_variants.py` is a training-module fragment, not a complete command-line runner. The launch example below records the earlier experiment interface and is not runnable as written. Use the current [cardiovascular benchmark](README_CARDIOVASCULAR_TARGET_BENCHMARK.md) or [paper-analysis workflow](../paper_analysis/README.md) for available orchestration commands.
+
 The continuous target is derived for each participant as:
 
 ```text
@@ -19,11 +21,11 @@ the training data. Held-out diagnostics report both original-volume metrics
 (`R2`, `MAE`, `RMSE`, Pearson and Spearman) and log-scale metrics
 (`TransformedR2`, `TransformedMAE`).
 
-## Female scan-and-age run
+## Historical female scan-and-age launch
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python run_full_meshvae_regression_variants.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.benchmarks.run_full_meshvae_regression_variants \
   --name_prefix PLAQUEVOL_F_scanfix_20260815 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808 \
   --train_cond_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_train_F.tsv \
@@ -42,10 +44,9 @@ cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
   --variants normal_scan_age
 ```
 
-The experiment name is
-`PLAQUEVOL_F_scanfix_20260815_vae_scan_age`. The runner trains the model and
-then automatically diagnoses its best checkpoint on the held-out test TSV.
-The concise result is written to:
+The earlier experiment used the name
+`PLAQUEVOL_F_scanfix_20260815_vae_scan_age`, with training followed by diagnosis
+of the best checkpoint on the held-out test TSV. Its concise result path was:
 
 ```text
 /data/projects/3D_scans/ML/MQVAE/checkpoints/PLAQUEVOL_F_scanfix_20260815_vae_scan_age/regression_summary.csv

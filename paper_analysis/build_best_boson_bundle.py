@@ -11,9 +11,10 @@ OUTPUT = ROOT/"outputs"/"gefion_boson"
 
 
 def main():
-    files = {path.relative_to(ROOT).as_posix(): path for path in (ROOT/"meshvae").glob("*.py")}
-    names = ["train_mesh_vae.py", "diagnose_mesh_binary.py", "diagnose_mesh_regression.py",
-             "check_boson_prior.py", "run_cardiovascular_target_benchmark.py"]
+    files = {path.relative_to(ROOT).as_posix(): path
+             for folder in ("meshvae", "scripts")
+             for path in (ROOT/folder).rglob("*.py")}
+    names = []
     names += [f"paper_analysis/{name}" for name in (
         "run_plaque_study.py", "plaque_cohorts.py", "plaque_reporting.py", "study_config.py",
         "next_steps_config.json", "next_steps_environment.sh", "selected_boson_study.py",

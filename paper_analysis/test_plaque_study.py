@@ -48,10 +48,9 @@ class PlaqueStudyTests(unittest.TestCase):
             data = root/"data"; data.mkdir()
             self.fixture(data)
             source = Path(__file__).resolve().parents[1]
-            for folder in ("meshvae", "paper_analysis"):
+            for folder in ("meshvae", "paper_analysis", "scripts"):
                 shutil.copytree(source/folder, checkout/folder,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.zip", "*.png", "*.pdf"))
-            shutil.copy(source/"run_cardiovascular_target_benchmark.py", checkout)
             config_path = checkout/"paper_analysis/next_steps_config.json"
             config = json.loads(config_path.read_text())
             config["platforms"]["computerome"] = {

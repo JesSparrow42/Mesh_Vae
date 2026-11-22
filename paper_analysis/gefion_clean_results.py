@@ -335,7 +335,7 @@ def training_command(reference, name, paths, group, variant, checkpoints, root=R
         o.pop('--only_gender', None)
     else:
         set_value(o, 'only_gender', group)
-    command = [sys.executable, str(Path(root) / 'train_mesh_vae.py')]
+    command = [sys.executable, str(Path(root) / 'scripts' / 'training' / 'train_mesh_vae.py')]
     for key, values in o.items():
         command.extend([key, *values])
     return command
@@ -343,7 +343,7 @@ def training_command(reference, name, paths, group, variant, checkpoints, root=R
 
 def evaluation_command(train_command, test_path, root=ROOT):
     o = command_options(train_command)
-    command = [sys.executable, str(Path(root) / 'diagnose_mesh_binary.py')]
+    command = [sys.executable, str(Path(root) / 'scripts' / 'diagnostics' / 'diagnose_mesh_binary.py')]
     for key in ('name', 'checkpoints_dir', 'dataroot', 'only_gender', 'seed', 'batch_size',
                 'cond_stregkode_col', 'cond_age_col', 'cond_gender_col'):
         if '--' + key in o:
@@ -1638,7 +1638,7 @@ def prepare_study(args):
 
 
 def preflight(plan, active_indices=()):
-    for relative in ("train_mesh_vae.py", "diagnose_mesh_binary.py", "paper_analysis/next_steps_environment.sh"):
+    for relative in ("scripts/training/train_mesh_vae.py", "scripts/diagnostics/diagnose_mesh_binary.py", "paper_analysis/next_steps_environment.sh"):
         if not (ROOT/relative).is_file():
             raise ValueError(f"Missing existing repository file: {ROOT/relative}")
     if str(ROOT) not in sys.path:
@@ -1656,7 +1656,7 @@ def preflight(plan, active_indices=()):
                 and any(run.iterdir()) and not (run/"clean_comparison_training_completed.json").is_file()):
             raise ValueError(f"Partial training exists in {run}; it will not be overwritten. Inspect it before starting another run.")
         if task["variant"].startswith("long_") and "boson" in task["variant"]:
-            for relative in ("check_boson_prior.py", "third_party/nonlinear_photonic_sampler"):
+            for relative in ("scripts/diagnostics/check_boson_prior.py", "third_party/nonlinear_photonic_sampler"):
                 if not (ROOT/relative).exists():
                     raise ValueError(f"Missing existing Boson sampler dependency: {ROOT/relative}")
     print("[PASS] All generated train/evaluate flags are supported; saved splits and partial-run safeguards verified.")

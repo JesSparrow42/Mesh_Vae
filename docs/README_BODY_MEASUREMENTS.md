@@ -19,12 +19,12 @@ On the server, start with a metadata-only audit and look for a suitable mapping
 table among the nearby CSV/TSV files:
 
 ```bash
-python run_body_measurements.py audit \
+python -m scripts.measurements.run_body_measurements audit \
   --metadata /data/projects/3D_scans/bodyscan_variables_for_validation_n1715.csv \
   --config body_measurements/targets.validation_n1715.json \
   --out-dir measurement_runs/validation_metadata_audit
 
-python run_body_measurements.py inspect-sources \
+python -m scripts.measurements.run_body_measurements inspect-sources \
   --metadata /data/projects/3D_scans/bodyscan_variables_for_validation_n1715.csv \
   --obj-root /data/preprocessed/3D_scans \
   --candidate-root /data/projects/3D_scans \
@@ -44,7 +44,7 @@ only vertex records, requires one unique scan ID per OBJ, and can resume from
 its partial CSV if interrupted:
 
 ```bash
-python run_body_measurements.py build-features \
+python -m scripts.measurements.run_body_measurements build-features \
   --obj-root /data/preprocessed/3D_scans \
   --workers 2 \
   --out-dir measurement_runs/validation_obj_features
@@ -59,7 +59,7 @@ scans or recorded scale factors before fitting centimetre targets.
 Once the mapping table and its column names are confirmed, link the labels:
 
 ```bash
-python run_body_measurements.py link-labels \
+python -m scripts.measurements.run_body_measurements link-labels \
   --metadata /data/projects/3D_scans/bodyscan_variables_for_validation_n1715.csv \
   --mapping /path/to/confirmed_row_obj_mapping.csv \
   --map-row-col ACTUAL_ROW_NUMBER_COLUMN \
@@ -74,14 +74,14 @@ scans without valid features. Its output
 Then run the full target coverage audit and baseline:
 
 ```bash
-python run_body_measurements.py audit \
+python -m scripts.measurements.run_body_measurements audit \
   --metadata measurement_runs/validation_linked/metadata_with_scan_id.csv \
   --id-col scan_id \
   --features measurement_runs/validation_obj_features/scan_geometry_features.npz \
   --config body_measurements/targets.validation_n1715.json \
   --out-dir measurement_runs/validation_join_audit
 
-python run_body_measurements.py train \
+python -m scripts.measurements.run_body_measurements train \
   --metadata measurement_runs/validation_linked/metadata_with_scan_id.csv \
   --id-col scan_id \
   --features measurement_runs/validation_obj_features/scan_geometry_features.npz \
@@ -157,7 +157,7 @@ Use the existing `scan_geometry_features.npz` built from **original, unnormalize
 OBJs**, or generate it with the existing script:
 
 ```bash
-python build_scan_geometry_features.py \
+python -m scripts.preprocessing.build_scan_geometry_features \
   --npz /path/to/simplified_padded_tensors.npz \
   --obj_roots /path/to/original_bodyscans \
   --out /path/to/scan_geometry_features.npz \
@@ -186,7 +186,7 @@ From this repository directory, using an environment with NumPy, pandas,
 scikit-learn, and joblib (`body_measurements/requirements.txt`):
 
 ```bash
-python run_body_measurements.py audit \
+python -m scripts.measurements.run_body_measurements audit \
   --metadata /path/to/manual_measurements.tsv \
   --id-col participant_id \
   --features /path/to/scan_geometry_features.npz \
@@ -214,7 +214,7 @@ Example below assumes the raw OBJ coordinates are in millimetres; replace `mm`
 with the verified units for your scans.
 
 ```bash
-python run_body_measurements.py train \
+python -m scripts.measurements.run_body_measurements train \
   --metadata /path/to/manual_measurements.tsv \
   --id-col participant_id \
   --features /path/to/scan_geometry_features.npz \
@@ -279,7 +279,7 @@ Build features from new original scans using the same exporter and coordinate
 units, then run without any measurement metadata:
 
 ```bash
-python run_body_measurements.py predict \
+python -m scripts.measurements.run_body_measurements predict \
   --features /path/to/new_scan_geometry_features.npz \
   --model measurement_runs/baseline_01/model.joblib \
   --scan-units mm \
@@ -296,7 +296,7 @@ objects.
 
 ## Detailed point-cloud experiment
 
-`run_body_measurements_pointcloud.py` adds an experimental local point-cloud
+`scripts/measurements/run_body_measurements_pointcloud.py` adds an experimental local point-cloud
 regressor while leaving the original baseline implementation unchanged. This
 is a candidate to test, with no claim of improved participant accuracy before
 the Computerome run has been evaluated.
@@ -339,13 +339,13 @@ cd /data/projects/3D_scans/ML/MQVAE_new
 PY=/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python
 export PYTHONUNBUFFERED=1 OMP_NUM_THREADS=2 MKL_NUM_THREADS=2
 
-"$PY" run_body_measurements_pointcloud.py build-cache \
+"$PY" -m scripts.measurements.run_body_measurements_pointcloud build-cache \
   --baseline-run measurement_runs/n2894_baseline_01 \
   --obj-root /data/preprocessed/3D_scans \
   --points 2048 --workers 2 \
   --out-dir measurement_runs/n2894_point_cache_2048
 
-"$PY" run_body_measurements_pointcloud.py train \
+"$PY" -m scripts.measurements.run_body_measurements_pointcloud train \
   --baseline-run measurement_runs/n2894_baseline_01 \
   --cache measurement_runs/n2894_point_cache_2048 \
   --device auto --batch-size 8 --threads 2 \
@@ -373,12 +373,12 @@ For inference, preserve the whole new model run, including its frozen baseline.
 Build the usual physical feature sidecar for new scans, then:
 
 ```bash
-"$PY" run_body_measurements_pointcloud.py build-cache \
+"$PY" -m scripts.measurements.run_body_measurements_pointcloud build-cache \
   --features measurement_runs/new_obj_features/scan_geometry_features.npz \
   --scan-units m --points 2048 --workers 2 \
   --out-dir measurement_runs/new_point_cache_2048
 
-"$PY" run_body_measurements_pointcloud.py predict \
+"$PY" -m scripts.measurements.run_body_measurements_pointcloud predict \
   --model-run measurement_runs/n2894_pointcloud_01 \
   --cache measurement_runs/new_point_cache_2048 \
   --device auto \
@@ -403,7 +403,7 @@ checkpoint is required.
 
 ## Expand the labelled scan collection
 
-`train_body_measurements_expanded.py` orchestrates the existing feature builder,
+`scripts/training/train_body_measurements_expanded.py` orchestrates the existing feature builder,
 baseline trainer and point-cloud trainer for a larger OBJ collection. Paste the
 contents of [`scripts/computerome/computerome_train_measurement_expanded_setup.sh`](../scripts/computerome/computerome_train_measurement_expanded_setup.sh) into Computerome,
 then run:
@@ -413,7 +413,7 @@ cd /data/projects/3D_scans/ML/MQVAE_new
 PY=/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python
 export PYTHONUNBUFFERED=1 OMP_NUM_THREADS=2 MKL_NUM_THREADS=2
 
-nohup "$PY" -u train_body_measurements_expanded.py \
+nohup "$PY" -u -m scripts.training.train_body_measurements_expanded \
   --obj-root /data/projects/3D_scans/3d_bodyscans \
   --old-baseline measurement_runs/n2894_baseline_01 \
   --out-dir measurement_runs/n2894_expanded_01 \

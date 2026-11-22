@@ -2,12 +2,12 @@
 
 Run the commands in this guide from the repository root.
 
-`run_all_15_models.py` is the main experiment runner. It uses the same body-scan
+`scripts/benchmarks/run_all_15_models.py` is the main experiment runner. It uses the same body-scan
 NPZ and metadata splits for every trainable row, resumes completed work, and
 writes one partial/final comparison table.
 
 The six scan-based VAE experiments are full long-running models trained through
-`train_mesh_vae.py` and evaluated through `diagnose_mesh_vae.py`:
+`scripts/training/train_mesh_vae.py` and evaluated through `scripts/diagnostics/diagnose_mesh_vae.py`:
 
 - Ordinary VAE: permutation-invariant point encoder, with and without age.
 - Convolution VAE: local kNN edge convolution, with and without age.
@@ -27,7 +27,7 @@ latent disease-classifier probability on the held-out internal validation subset
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python run_all_15_models.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.benchmarks.run_all_15_models \
   --name_prefix FULL15_F_combined_fast_20260808_v2_20260809 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808 \
   --train_cond_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_combined_fast_20260808_train_F.tsv \

@@ -87,7 +87,7 @@ def training_command(name, paths, experiment, gender, config, platform):
     p = config["platforms"][platform]
     if config.get("reference_train_command"):
         cmd = list(config["reference_train_command"])
-        cmd[:2] = [sys.executable, str(ROOT/"train_mesh_vae.py")]
+        cmd[:2] = [sys.executable, str(ROOT/"scripts"/"training"/"train_mesh_vae.py")]
         for option, value in [("--name", name), ("--checkpoints_dir", p["checkpoints"]),
                               ("--cond_tsv", paths["train"]), ("--val_cond_tsv", paths["validation"]),
                               ("--seed", config["seed"]),
@@ -111,7 +111,7 @@ def training_command(name, paths, experiment, gender, config, platform):
 
 def default_training_command(name, paths, experiment, gender, config, platform):
     p = config["platforms"][platform]
-    cmd = [sys.executable, str(ROOT/"train_mesh_vae.py"), "--name", name,
+    cmd = [sys.executable, str(ROOT/"scripts"/"training"/"train_mesh_vae.py"), "--name", name,
            "--checkpoints_dir", p["checkpoints"], "--dataroot", p["dataroot"],
            "--cond_tsv", str(paths["train"]), "--val_cond_tsv", str(paths["validation"]),
            "--only_gender", gender, "--gpu_ids", "0", "--seed", str(config["seed"]),
@@ -147,7 +147,7 @@ def diagnosis(name, gender, kind, frame, split, outdir, config, platform):
     path = outdir/f"evaluate_{split}.tsv"
     frame.to_csv(path, sep="\t", index=False)
     diag = "binary" if kind == "binary" else "regression"
-    command([sys.executable, ROOT/f"diagnose_mesh_{diag}.py", "--name", name,
+    command([sys.executable, ROOT/"scripts"/"diagnostics"/f"diagnose_mesh_{diag}.py", "--name", name,
              "--checkpoints_dir", p["checkpoints"], "--dataroot", p["dataroot"], "--cond_tsv", path,
              "--only_gender", gender, "--gpu_ids", "0", "--which_epoch", "best",
              "--batch_size", str(config["batch_size"]), "--seed", str(config["seed"]),
@@ -181,7 +181,7 @@ def execute_model(name, gender, exp, selected, evaluation, outdir, config, platf
             raise RuntimeError(f"Incomplete previous training in {run}. Change run_tag to restart; a partial checkpoint is not treated as finished.")
         if config.get("prior_arm") == "boson_mmd":
             latent_dim = cmd[cmd.index("--latent_dim")+1] if "--latent_dim" in cmd else "256"
-            preflight = [sys.executable, str(ROOT/"check_boson_prior.py"), "--latent_dim", latent_dim,
+            preflight = [sys.executable, str(ROOT/"scripts"/"diagnostics"/"check_boson_prior.py"), "--latent_dim", latent_dim,
                          "--samples", "512", "--boson_params", json.dumps(config.get("boson_params", {}), sort_keys=True)]
             if config.get("boson_sampler_path"):
                 preflight += ["--boson_sampler_path", config["boson_sampler_path"]]

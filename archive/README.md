@@ -1,6 +1,6 @@
 # Historical code
 
-This folder keeps earlier implementations, experiments, and notebooks for reference. The active implementation lives in [`meshvae/`](../meshvae/), [`body_measurements/`](../body_measurements/), and [`paper_analysis/`](../paper_analysis/), with the current Python entry points in the repository root.
+This folder keeps earlier implementations, experiments, and notebooks for reference. The active implementation lives in [`meshvae/`](../meshvae/), [`body_measurements/`](../body_measurements/), and [`paper_analysis/`](../paper_analysis/), with current entry points grouped in [`scripts/`](../scripts/README.md).
 
 | Folder | Contents |
 | --- | --- |

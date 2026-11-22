@@ -61,7 +61,7 @@ echo "========== ENVIRONMENT =========="
 "$PYTHON" -c "import sys, torch, numpy, pandas, scipy, sklearn, trimesh, open3d, matplotlib; assert torch.cuda.is_available(), 'PyTorch cannot see the GPU'; print('[ENV] ALL REQUIRED IMPORTS WORK'); print('[ENV] Python', sys.version.split()[0]); print('[ENV] PyTorch', torch.__version__); print('[ENV] Open3D', open3d.__version__); print('[ENV] GPU', torch.cuda.get_device_name(0))"
 
 echo "========== BUILD TARGET-ENRICHED SPLITS =========="
-"$PYTHON" run_cardiovascular_target_benchmark.py \
+"$PYTHON" scripts/benchmarks/run_cardiovascular_target_benchmark.py \
   --name_prefix "$PREP_NAME" \
   --dataroot "$DATA_ROOT" \
   --metadata_tsv "$METADATA" \
@@ -78,7 +78,7 @@ ENRICHED_ROOT="$CHECKPOINT_ROOT/$PREP_NAME/enriched_splits"
 echo "========== TRAIN SCAN-ONLY ENCODER =========="
 # num_threads stays at zero because Open3D TriangleMesh objects cannot be
 # pickled safely by PyTorch DataLoader workers.
-"$PYTHON" train_mesh_vae.py \
+"$PYTHON" scripts/training/train_mesh_vae.py \
   --phase train \
   --name "$RUN_NAME" \
   --checkpoints_dir "$CHECKPOINT_ROOT" \
@@ -125,7 +125,7 @@ echo "========== TRAIN SCAN-ONLY ENCODER =========="
   --no-balance_athero
 
 echo "========== HELD-OUT TEST =========="
-"$PYTHON" diagnose_mesh_binary.py \
+"$PYTHON" scripts/diagnostics/diagnose_mesh_binary.py \
   --name "$RUN_NAME" \
   --checkpoints_dir "$CHECKPOINT_ROOT" \
   --dataroot "$DATA_ROOT" \

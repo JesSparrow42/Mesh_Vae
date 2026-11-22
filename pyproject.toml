@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel>=0.41"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meshvae-research"
+dynamic = ["version"]
+description = "Mesh and point-cloud representation learning for body-scan research."
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["mesh", "point-cloud", "variational-autoencoder", "body-scan", "research"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+measurement = ["torch>=2.1"]
+vae = ["torch>=2.1", "trimesh>=4.0", "open3d>=0.18"]
+analysis = ["matplotlib>=3.7", "seaborn>=0.12", "python-docx>=1.1"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+meshvae-train = "scripts.training.train_mesh_vae:main"
+meshvae-measurements = "scripts.measurements.run_body_measurements:main"
+meshvae-pointcloud = "scripts.measurements.run_body_measurements_pointcloud:main"
+meshvae-diagnose = "scripts.diagnostics.diagnose_mesh_vae:main"
+meshvae-plaque-study = "paper_analysis.run_plaque_study:main"
+
+[project.urls]
+Repository = "https://github.com/JesSparrow42/Mesh_Vae"
+Documentation = "https://github.com/JesSparrow42/Mesh_Vae#readme"
+Issues = "https://github.com/JesSparrow42/Mesh_Vae/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "meshvae._version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["meshvae*", "body_measurements*", "paper_analysis*", "scripts*", "third_party*"]
+exclude = ["archive*", "outputs*", "tools*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.sh"]
+"paper_analysis" = ["*.md", "tests/fixtures/**/*.csv"]
+"third_party.nonlinear_photonic_sampler" = ["UPSTREAM.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["body_measurements/tests", "paper_analysis"]
+norecursedirs = [".git", ".venv", "archive", "outputs", "build", "dist"]

@@ -2,7 +2,7 @@
 
 Run the commands in this guide from the repository root.
 
-`run_cardiovascular_target_benchmark.py` preserves the existing female
+`scripts/benchmarks/run_cardiovascular_target_benchmark.py` preserves the existing female
 train/test participant split, enriches those rows from the newer master
 metadata TSV, audits every target, and runs the same two architectures for
 each usable target:
@@ -41,7 +41,7 @@ an audit showing whether supplied totals disagree with those sums.
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && nohup env CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python run_cardiovascular_target_benchmark.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.benchmarks.run_cardiovascular_target_benchmark \
   --name_prefix CARDIO_TARGETS_F_20260817 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808 \
   --metadata_tsv /data/projects/3D_scans/3d_bodyscan_20260604.tsv \

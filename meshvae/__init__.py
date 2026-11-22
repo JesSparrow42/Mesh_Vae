@@ -4,7 +4,10 @@ Heavy torch modules are loaded lazily so metadata and preprocessing utilities
 can run in a lightweight Python environment.
 """
 
+from ._version import __version__
+
 __all__ = [
+    "__version__",
     "MeshVAEModel",
     "get_scheduler",
     "MeshVAE",

@@ -21,7 +21,7 @@ The new path:
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python build_scan_geometry_features.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.preprocessing.build_scan_geometry_features \
   --npz /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808/simplified_padded_tensors.npz \
   --obj_roots /data/projects/3D_scans/3d_bodyscans \
   --out /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808/scan_geometry_features.npz \
@@ -51,7 +51,7 @@ cd /data/projects/3D_scans/ML/MQVAE && \
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python run_model_comparison.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.benchmarks.run_model_comparison \
   --name SCAN_GATE_F_20260811 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808 \
   --train_cond_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_train_F.tsv \
@@ -73,7 +73,7 @@ cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python screen_metadata_predictors.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.analysis.screen_metadata_predictors \
   --train_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_train_F.tsv \
   --test_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_test_F.tsv \
   --out_dir /data/projects/3D_scans/ML/MQVAE/checkpoints/METADATA_SCREEN_F_20260811 \
@@ -89,7 +89,7 @@ cd /data/projects/3D_scans/ML/MQVAE && \
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && \
 nohup env CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python run_all_15_models.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.benchmarks.run_all_15_models \
   --name_prefix FULL15_F_scanfix_20260811 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808 \
   --train_cond_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_train_F.tsv \

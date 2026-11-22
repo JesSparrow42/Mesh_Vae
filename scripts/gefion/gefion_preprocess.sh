@@ -42,7 +42,7 @@ run_site() {
         return 0
     fi
     echo "[SITE] starting $site_name from $obj_root at $(date -Iseconds)"
-    "$PYTHON" train_mesh_vae.py \
+    "$PYTHON" scripts/training/train_mesh_vae.py \
       --phase preprocess \
       --name "PREPROCESS_GEFION_${site_name}_20260823" \
       --checkpoints_dir "$CHECKPOINT_ROOT" \
@@ -74,7 +74,7 @@ for npz in "${SITE_NPZS[@]}"; do
 done
 
 echo "[MERGE] starting at $(date -Iseconds)"
-"$PYTHON" train_mesh_vae.py \
+"$PYTHON" scripts/training/train_mesh_vae.py \
   --phase preprocess \
   --name PREPROCESS_GEFION_ALL_20260823 \
   --checkpoints_dir "$CHECKPOINT_ROOT" \
@@ -85,7 +85,7 @@ echo "[MERGE] starting at $(date -Iseconds)"
   --n_points 25000
 
 echo "[GEOMETRY] starting at $(date -Iseconds)"
-"$PYTHON" build_scan_geometry_features.py \
+"$PYTHON" scripts/preprocessing/build_scan_geometry_features.py \
   --npz "$OUTPUT_ROOT/simplified_padded_tensors.npz" \
   --obj_roots \
     "$TRANSFER_ROOT/Glostrup" \

@@ -10,7 +10,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-import run_body_measurements as cli
+from scripts.measurements import run_body_measurements as cli
 from body_measurements.data import read_metadata
 from body_measurements.joins import link_validation_rows
 

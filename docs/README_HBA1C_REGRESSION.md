@@ -2,14 +2,14 @@
 
 Run the commands in this guide from the repository root.
 
-`run_all_15_hba1c_models.py` repeats the 15-row experiment design with
+`scripts/benchmarks/run_all_15_hba1c_models.py` repeats the 15-row experiment design with
 `glycohemoglobin_hba1c` as a continuous outcome. It does not turn HbA1c into an
 arbitrary binary class. Results therefore use R-squared, MAE, RMSE, Pearson
 correlation, and Spearman correlation instead of accuracy, sensitivity, and
 specificity.
 
 The six scan-based VAE rows still call the full, long-running
-`train_mesh_vae.py` pipeline. Their latent disease-classification head is
+`scripts/training/train_mesh_vae.py` pipeline. Their latent disease-classification head is
 disabled and replaced by a one-output regression head. The former logistic
 classification comparison is implemented as linear regression, which is the
 corresponding baseline for a continuous target.
@@ -23,7 +23,7 @@ training-mean baseline alongside the model metrics.
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python run_all_15_hba1c_models.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.benchmarks.run_all_15_hba1c_models \
   --name_prefix HBA1C_FULL15_F_scanfix_20260813 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined_fast_20260808 \
   --train_cond_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_train_F.tsv \

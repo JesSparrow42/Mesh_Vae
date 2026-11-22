@@ -16,9 +16,9 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
-from build_scan_geometry_features import FEATURE_NAMES, parse_obj_vertices
-from run_body_measurements import fingerprint
-import train_body_measurements_expanded as workflow
+from scripts.preprocessing.build_scan_geometry_features import FEATURE_NAMES, parse_obj_vertices
+from scripts.measurements.run_body_measurements import fingerprint
+from scripts.training import train_body_measurements_expanded as workflow
 
 
 def command(*args):
@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix="measurement_expansion_") as tmp:
                                "split": ["train"]*24 + ["validation"]*8 + ["test"]*8})
     old_splits.to_csv(root / "old_splits.csv", index=False)
     baseline = root / "baseline"
-    command(REPO / "run_body_measurements.py", "train", "--metadata", root / "metadata.csv",
+    command(REPO / "scripts" / "measurements" / "run_body_measurements.py", "train", "--metadata", root / "metadata.csv",
             "--id-col", "scan_id", "--participant-col", "person_id", "--config", root / "targets.json",
             "--features", root / "old_geometry.npz", "--splits", root / "old_splits.csv",
             "--scan-units", "m", "--n-jobs", "2", "--out-dir", baseline)

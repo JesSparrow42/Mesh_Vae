@@ -14,8 +14,8 @@ import pandas as pd
 from sklearn.linear_model import Ridge
 import torch
 
-import run_body_measurements_pointcloud as pc
-from run_body_measurements import fingerprint
+from scripts.measurements import run_body_measurements_pointcloud as pc
+from scripts.measurements.run_body_measurements import fingerprint
 
 
 class DetailedMeasurementTests(unittest.TestCase):

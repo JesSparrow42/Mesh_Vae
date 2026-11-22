@@ -15,7 +15,7 @@ Use a new output dataroot so the old NPZ is not overwritten:
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python train_mesh_vae.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.training.train_mesh_vae \
   --phase preprocess \
   --name PREPROCESS_combined_20260715 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined \
@@ -33,7 +33,7 @@ If `/data/projects/3D_scans/ML/MQVAE_combined/simplified` already contains `*_si
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python train_mesh_vae.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.training.train_mesh_vae \
   --phase preprocess \
   --name PACK_combined_simplified_20260808 \
   --dataroot /data/projects/3D_scans/ML/MQVAE_combined \

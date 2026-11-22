@@ -2,7 +2,7 @@
 
 Run the commands in this guide from the repository root.
 
-This patch keeps the old command entry points and adds one switch:
+The clinical-conditioning workflow uses the categorized training and diagnostic commands and adds one switch:
 
 ```bash
 --feature_source scan        # default, old behavior
@@ -21,7 +21,7 @@ TSV. It is intended as a sanity check, not as the final body-scan model.
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE
-python make_train_test_split.py \
+python -m meshvae.make_train_test_split \
   --input_tsv /data/projects/3D_scans/3d_bodyscan_20260604.tsv \
   --out_dir /data/projects/3D_scans/datasets \
   --prefix 3d_bodyscan_20260604 \
@@ -43,7 +43,7 @@ corrected plaque volume columns as `volume > 0`.
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python train_mesh_vae.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.training.train_mesh_vae \
   --name REACT_F_18_70_ldl_sanity \
   --cond_tsv /data/projects/3D_scans/datasets/3d_bodyscan_20260604_train_F.tsv \
   --feature_source ldl \
@@ -67,7 +67,7 @@ Use the same `--name` and the same `--feature_source` as training:
 
 ```bash
 cd /data/projects/3D_scans/ML/MQVAE && CUDA_VISIBLE_DEVICES=0 \
-/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python diagnose_mesh_vae.py \
+/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python -m scripts.diagnostics.diagnose_mesh_vae \
   --name REACT_F_18_70_ldl_sanity \
   --feature_source ldl \
   --only_gender F \

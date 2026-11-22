@@ -95,7 +95,7 @@ def check_runtime_compatibility():
                for node in adapter_tree.body):
         raise ValueError("Outdated meshvae/boson.py: the Sparrow integration is missing. "
                          "No jobs should be submitted yet.")
-    required = ["check_boson_prior.py", "third_party/nonlinear_photonic_sampler/bosonsampler/__init__.py",
+    required = ["scripts/diagnostics/check_boson_prior.py", "third_party/nonlinear_photonic_sampler/bosonsampler/__init__.py",
                 "third_party/nonlinear_photonic_sampler/bosonsampler/__version__.py",
                 "third_party/nonlinear_photonic_sampler/bosonsampler/core.py"]
     missing_files = [name for name in required if not (ROOT/name).is_file()]
