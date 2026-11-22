@@ -1,0 +1,31 @@
+{
+  "run_tag": "next_v1",
+  "seed": 42,
+  "niter": 150,
+  "niter_decay": 0,
+  "batch_size": 8,
+  "validation_fraction": 0.15,
+  "minimum_train": 50,
+  "minimum_validation": 10,
+  "age_top_fraction": 0.2,
+  "age_band_width": 10,
+  "bootstraps": 500,
+  "weight_col": null,
+  "age_col": null,
+  "platforms": {
+    "gefion": {
+      "dataroot": "/dcai/projects/cu_0080/results/MQVAE_gefion_20260823",
+      "metadata": "/dcai/projects/cu_0080/xfer/sftp/inbox/REACT-Q/body_scan_metadata20260817.tsv",
+      "checkpoints": "/dcai/projects/cu_0080/results/checkpoints",
+      "train_template": "/dcai/projects/cu_0080/datasets/3d_bodyscan_20260817_gefion_20260823_train_{gender}.tsv",
+      "test_template": "/dcai/projects/cu_0080/datasets/3d_bodyscan_20260817_gefion_20260823_test_{gender}.tsv"
+    },
+    "computerome": {
+      "dataroot": "/data/projects/3D_scans/ML/MQVAE_combined_fast_20260808",
+      "metadata": "/data/projects/3D_scans/3d_bodyscan_20260604.tsv",
+      "checkpoints": "checkpoints",
+      "train_template": "/data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_train_{gender}.tsv",
+      "test_template": "/data/projects/3D_scans/datasets/3d_bodyscan_20260604_scanfix_20260811_test_{gender}.tsv"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "description": "Map confirmed manual-measurement columns and their source units. Null columns disable targets. Predictions are in cm.",
+  "targets": {
+    "bust_circumference": {"letter": "A", "column": null, "unit": null},
+    "underbust_circumference": {"letter": "B", "column": null, "unit": null},
+    "high_waist_circumference": {"letter": "C", "column": null, "unit": null},
+    "waist_circumference": {"letter": "D", "column": null, "unit": null},
+    "high_hip_circumference": {"letter": "E", "column": null, "unit": null},
+    "hip_circumference": {"letter": "F", "column": null, "unit": null},
+    "buttock_circumference": {"letter": "G", "column": null, "unit": null},
+    "total_thigh_circumference": {"letter": "H", "column": null, "unit": null},
+    "neck_circumference": {"letter": "I", "column": null, "unit": null},
+    "abdominal_circumference": {"letter": "J", "column": null, "unit": null},
+    "max_abdominal_circumference": {"letter": "K", "column": null, "unit": null},
+    "waistband_circumference": {"letter": "L", "column": null, "unit": null},
+    "body_height": {"letter": "M", "column": null, "unit": null},
+    "shoulder_width": {"letter": "N", "column": null, "unit": null},
+    "wrist_circumference": {"letter": "O", "column": null, "unit": null},
+    "left_thigh_circumference": {"letter": "P", "column": null, "unit": null},
+    "right_thigh_circumference": {"letter": "Q", "column": null, "unit": null}
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "description": "Exact manual measurement headers visible in bodyscan_variables_for_validation_n1715.csv; verify the source export and units before fitting.",
+  "targets": {
+    "bust_circumference": {"letter": "A", "column": "bust_chest_girth_cm_3d", "unit": "cm"},
+    "underbust_circumference": {"letter": "B", "column": "underbust_circumference_horizontal_cm_3d", "unit": "cm"},
+    "high_waist_circumference": {"letter": "C", "column": "high_waist_girth_cm_3d", "unit": "cm"},
+    "waist_circumference": {"letter": "D", "column": "waist_girth_cm_3d", "unit": "cm"},
+    "high_hip_circumference": {"letter": "E", "column": "high_hip_girth_cm_3d", "unit": "cm"},
+    "hip_circumference": {"letter": "F", "column": "hip_girth_cm_3d", "unit": "cm"},
+    "buttock_circumference": {"letter": "G", "column": "buttock_girth_cm_3d", "unit": "cm"},
+    "total_thigh_circumference": {"letter": "H", "column": "hip_thigh_girth_cm_3d", "unit": "cm"},
+    "neck_circumference": {"letter": "I", "column": "mid_neck_girth_cm_3d", "unit": "cm"},
+    "abdominal_circumference": {"letter": "J", "column": "belly_circumference_cm_3d", "unit": "cm"},
+    "max_abdominal_circumference": {"letter": "K", "column": "maximum_belly_circumference_cm_3d", "unit": "cm"},
+    "waistband_circumference": {"letter": "L", "column": "waist_band_cm_3d", "unit": "cm"},
+    "body_height": {"letter": "M", "column": "body_height_cm_3d", "unit": "cm"},
+    "shoulder_width": {"letter": "N", "column": "cross_shoulder_over_neck_cm_3d", "unit": "cm"},
+    "wrist_circumference": {"letter": "O", "column": "wrist_girth_cm_3d", "unit": "cm"},
+    "left_thigh_circumference": {"letter": "P", "column": "thigh_girth_left_horizontal_cm_3d", "unit": "cm"},
+    "right_thigh_circumference": {"letter": "Q", "column": "thigh_girth_right_horizontal_cm_3d", "unit": "cm"}
+  }
+}

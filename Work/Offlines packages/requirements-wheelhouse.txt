@@ -1,0 +1,8 @@
+umap-learn
+pynndescent
+pyrender
+PyOpenGL
+freetype-py
+open3d
+plotly
+dash

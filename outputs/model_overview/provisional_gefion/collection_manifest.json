@@ -1,0 +1,13 @@
+{
+  "inputs": [
+    "C:\\Users\\JonatanEmilSvendsen\\OneDrive - Sparrow Quantum Aps\\Desktop\\meshvae_refactor\\.presentation_build_gefion"
+  ],
+  "platform": "gefion",
+  "mode": "collect",
+  "counts": {
+    "all_results.csv": 46,
+    "confidence_intervals.csv": 0,
+    "result_inventory.csv": 1
+  },
+  "note": "Saved results only; no metrics or confidence intervals computed. Unknown split provenance remains unverified."
+}

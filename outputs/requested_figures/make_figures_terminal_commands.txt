@@ -1,0 +1,343 @@
+(
+set -u
+if [[ -d /dcai/projects/cu_0080/MQVAE_new ]]; then
+    cd /dcai/projects/cu_0080/MQVAE_new || exit 1
+    PLATFORM=gefion
+    source paper_analysis/next_steps_environment.sh gefion || exit 1
+elif [[ -d /data/projects/3D_scans/ML/MQVAE_new ]]; then
+    cd /data/projects/3D_scans/ML/MQVAE_new || exit 1
+    PLATFORM=computerome
+    STUDY_PYTHON=/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python
+else
+    echo "Could not find MQVAE_new on Gefion or Computerome." >&2
+    exit 1
+fi
+if [[ -f paper_analysis/make_requested_figures.py ]]; then
+    cp -- paper_analysis/make_requested_figures.py "paper_analysis/make_requested_figures.py.before_figures_$(date +%Y%m%d_%H%M%S)" || exit 1
+fi
+cat > paper_analysis/make_requested_figures.py <<'FIGURE_PYTHON'
+#!/usr/bin/env python3
+"""Plot saved long-run losses and audited Gefion AUCs; no training/GPU/project imports."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOTS = {
+    "gefion": Path("/dcai/projects/cu_0080/results/checkpoints"),
+    "computerome": Path("/data/projects/3D_scans/ML/MQVAE/checkpoints"),
+}
+COLORS = {"F": "#178D91", "M": "#D47560"}
+SEED = 42
+
+
+def pyplot():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    return plt
+
+
+def source(path):
+    path = Path(path)
+    return {"path": str(path.resolve()), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def save_json(path, value):
+    Path(path).write_text(json.dumps(value, indent=2, allow_nan=False), encoding="utf-8")
+
+
+def save_plot(fig, stem):
+    fig.savefig(str(stem) + ".png", dpi=300, bbox_inches="tight", facecolor="white")
+    fig.savefig(str(stem) + ".pdf", bbox_inches="tight", facecolor="white")
+    pyplot().close(fig)
+
+
+def style(ax):
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", color="#DDE4EA", linewidth=.7)
+    ax.set_axisbelow(True)
+
+
+def clean_id(value):
+    if pd.isna(value):
+        return ""
+    text = str(value).replace("\\", "/").split("/")[-1].strip().strip("\"'")
+    text = re.sub(r"\.obj$", "", text, flags=re.I).strip(" !").upper()
+    match = re.search(r"([A-Z]{2,}DET\d{5,10})", text)
+    return match.group(1) if match else re.sub(r"[^A-Z0-9]", "", text)
+
+
+def read_predictions(path, columns):
+    data = pd.read_csv(path, dtype={"participant_id": str})
+    required = ["participant_id", "target", *columns]
+    if not set(required).issubset(data):
+        raise ValueError(f"Missing prediction columns {sorted(set(required)-set(data))}: {path}")
+    data = data[required].copy()
+    data["participant_id"] = data.participant_id.map(clean_id)
+    if data.participant_id.eq("").any() or data.participant_id.duplicated().any():
+        raise ValueError(f"Missing/duplicate normalized participant IDs: {path}")
+    values = data[["target", *columns]].apply(pd.to_numeric, errors="coerce").to_numpy(float)
+    if not np.isfinite(values).all() or not np.isin(values[:, 0], [0, 1]).all():
+        raise ValueError(f"Nonfinite predictions or nonbinary targets: {path}")
+    if ((values[:, 1:] < 0) | (values[:, 1:] > 1)).any():
+        raise ValueError(f"Probabilities outside [0, 1]: {path}")
+    data[["target", *columns]] = values
+    if data.target.nunique() != 2:
+        raise ValueError(f"AUC requires positive and negative participants: {path}")
+    return data.set_index("participant_id").sort_index()
+
+
+def auc(y, scores):
+    order = np.argsort(scores, kind="stable")
+    _, start, count = np.unique(np.asarray(scores)[order], return_index=True, return_counts=True)
+    ranks = np.empty(len(y), float)
+    ranks[order] = np.repeat(start + (count + 1) / 2, count)
+    positive = np.asarray(y) == 1
+    n1, n0 = int(positive.sum()), int((~positive).sum())
+    return float((ranks[positive].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
+
+
+def auc_intervals(data, models, bootstraps, paired=None):
+    y = data.target.to_numpy(float)
+    scores = data[models].to_numpy(float)
+    classes = [np.flatnonzero(y == label) for label in (0, 1)]
+    rng = np.random.default_rng(SEED)
+    draws = np.empty((bootstraps, len(models)))
+    for b in range(bootstraps):
+        idx = np.concatenate([rng.choice(group, len(group), replace=True) for group in classes])
+        for j in range(len(models)):
+            draws[b, j] = auc(y[idx], scores[idx, j])
+    bounds = np.quantile(draws, [.025, .975], axis=0)
+    if paired is not None and {"Scans + age", "Age only\n(logistic baseline)"}.issubset(models):
+        a, b = models.index("Scans + age"), models.index("Age only\n(logistic baseline)")
+        low, high = np.quantile(draws[:, a]-draws[:, b], [.025, .975])
+        paired.append({"Contrast": "Scans + age minus age-only logistic baseline", "N": len(y),
+                       "AUCDifference": auc(y, scores[:, a])-auc(y, scores[:, b]), "CI95Lower": low, "CI95Upper": high})
+    return [{"Model": name, "N": len(y), "Positive": int(y.sum()),
+             "AUC": auc(y, scores[:, j]), "CI95Lower": bounds[0, j], "CI95Upper": bounds[1, j]}
+            for j, name in enumerate(models)]
+
+
+def old_predictions_path(run):
+    summary = Path(run) / "binary_summary.csv"
+    table = pd.read_csv(summary)
+    if len(table) != 1 or "ResultsDir" not in table or pd.isna(table.iloc[0].ResultsDir):
+        raise ValueError(f"Need one unambiguous ResultsDir in {summary}; no latest-file guessing.")
+    for column in ("Experiment", "name", "Name", "Run", "RunName"):
+        if column in table and str(table.iloc[0][column]) != Path(run).name:
+            raise ValueError(f"Summary {column} does not identify the expected run: {summary}")
+    recorded = Path(str(table.iloc[0].ResultsDir))
+    candidates = [recorded / "predictions.csv", Path(run) / recorded / "predictions.csv",
+                  Path(run) / "binary_diagnostics" / recorded.name / "predictions.csv"]
+    found = {p.resolve() for p in candidates if p.is_file()}
+    if len(found) != 1:
+        raise ValueError(f"Summary prediction path is missing/ambiguous in {run}; found {len(found)} files.")
+    return found.pop(), summary
+
+
+def cohort_audit(new, old):
+    a, b = set(new.index), set(old.index)
+    info = {"next_N": len(a), "historical_N": len(b), "next_only": len(a-b), "historical_only": len(b-a)}
+    if a != b:
+        return {**info, "status": "different_participants"}
+    differences = int(np.count_nonzero(new.target.to_numpy() != old.loc[new.index].target.to_numpy()))
+    return {**info, "target_disagreements": differences,
+            "status": "target_mismatch" if differences else "exact_match"}
+
+
+def auc_plot(table, models, stem, title, note):
+    plt = pyplot()
+    fig, ax = plt.subplots(figsize=(10, 5.7))
+    x = np.arange(len(models)); width = .33
+    for gender, offset in (("F", -width/2), ("M", width/2)):
+        rows = table[table.Gender.eq(gender)].set_index("Model")
+        for i, name in enumerate(models):
+            if name not in rows.index:
+                continue
+            row = rows.loc[name]; at = x[i] + offset
+            ax.bar(at, row.AUC, width, color=COLORS[gender],
+                   label={"F": "Women (F)", "M": "Men (M)"}[gender] if i == 0 else None)
+            ax.vlines(at, row.CI95Lower, row.CI95Upper, color="#182C3B", linewidth=1.5)
+            ax.hlines([row.CI95Lower, row.CI95Upper], at-.045, at+.045, color="#182C3B", linewidth=1.5)
+            ax.text(at, min(1.025, max(row.AUC, row.CI95Upper)+.018), f"{row.AUC:.3f}", ha="center", fontsize=11)
+    ax.axhline(.5, color="#697886", linestyle=":", linewidth=1)
+    ax.set(xticks=x, xticklabels=models, ylim=(0, 1.09), yticks=np.arange(0, 1.01, .2), ylabel="Held-out ROC AUC", title=title)
+    style(ax); ax.legend(loc="lower center", frameon=False, ncol=2)
+    fig.text(.5, .025, note + "\n95% participant bootstrap CIs; fixed fitted models, not training-seed uncertainty.",
+             ha="center", fontsize=8.4)
+    fig.tight_layout(rect=(0, .09, 1, 1)); save_plot(fig, stem)
+
+
+def make_auc(args):
+    if args.platform != "gefion":
+        raise ValueError("The requested three-way AUC comparison is for Gefion.")
+    out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
+    audited, inputs, frames, old_frames = {}, [], {}, {}
+    for gender in ("F", "M"):
+        new_run = args.checkpoints_dir / f"GEFION_NEXT_weight_binary_age_{gender}_{args.next_run_tag}_seed42"
+        path = new_run / "study" / "heldout" / "predictions.csv"
+        frames[gender] = read_predictions(path, ["meshvae", "age"])
+        inputs.append(source(path))
+        old_run = args.checkpoints_dir / f"GEFION_SCANONLY_ANYPLAQ_{gender}_{args.old_run_tag}_seed42"
+        try:
+            path, summary = old_predictions_path(old_run)
+            old_frames[gender] = read_predictions(path, ["probability"])
+            inputs.extend([source(summary), source(path)])
+            audited[gender] = cohort_audit(frames[gender], old_frames[gender])
+        except (OSError, ValueError, pd.errors.ParserError) as exc:
+            audited[gender] = {"status": "historical_unavailable", "reason": str(exc)}
+    matched = all(info["status"] == "exact_match" for info in audited.values())
+    rows, paired_rows = [], []
+    for gender, frame in frames.items():
+        frame = frame.rename(columns={"meshvae": "Scans + age", "age": "Age only\n(logistic baseline)"})
+        models = ["Scans + age", "Age only\n(logistic baseline)"]
+        if matched:
+            frame["Scans only"] = old_frames[gender].loc[frame.index].probability
+            models.insert(0, "Scans only")
+        paired = []
+        rows.extend({**row, "Gender": gender, "Cohort": "verified_comparison"}
+                    for row in auc_intervals(frame, models, args.bootstraps, paired))
+        paired_rows.extend({**row, "Gender": gender} for row in paired)
+    if not matched:
+        warnings.warn("Historical scans-only cohorts could not all be matched exactly. No three-way plot was made; see auc_audit.json.")
+        for gender, frame in old_frames.items():
+            frame = frame.rename(columns={"probability": "Scans only"})
+            rows.extend({**row, "Gender": gender, "Cohort": "historical_separate"}
+                        for row in auc_intervals(frame, ["Scans only"], args.bootstraps))
+    table = pd.DataFrame(rows)
+    table.to_csv(out/"auc_summary.csv", index=False)
+    pd.DataFrame(paired_rows).to_csv(out/"paired_auc_differences.csv", index=False)
+    provenance = {"audit": audited, "three_way_comparison": matched, "inputs": inputs,
+                  "bootstrap": {"method": "class-stratified participant percentile", "resamples": args.bootstraps,
+                                "seed": SEED, "confidence_level": .95, "same_draws_within_gender": True},
+                  "age_model": "Saved age column: training-fitted ridge-penalized age-only logistic regression; no retraining.",
+                  "uncertainty_scope": "Held-out participant sampling conditional on fixed trained models, not training seeds.",
+                  "historical_comparison_scope": "Old scans-only and next-run models used different training settings/budgets; not an isolated age ablation."}
+    save_json(out/"auc_audit.json", provenance)
+    models = ["Scans + age", "Age only\n(logistic baseline)"]
+    if matched:
+        models.insert(0, "Scans only")
+    auc_plot(table[table.Cohort.eq("verified_comparison")], models, out/"gefion_auc_comparison",
+             "Gefion: plaque presence", "Same participants within each gender; historic training settings differ, so this is not an isolated age ablation." if matched
+             else "Same held-out participants within each gender; age-only is a logistic baseline.")
+    if not matched and old_frames:
+        auc_plot(table[table.Cohort.eq("historical_separate")], ["Scans only"], out/"gefion_scans_only_historical",
+                 "Historical Gefion scans-only models", "Separate historical cohort; not a matched comparison with the next-run models.")
+    print(table.to_string(index=False)); print(f"[OUT] {out.resolve()}")
+    return provenance
+
+
+def epoch_history(train_path, val_path):
+    train = pd.read_csv(train_path)
+    val = pd.read_csv(val_path) if Path(val_path).is_file() else None
+    for frame, path in ((train, train_path), (val, val_path)):
+        if frame is None:
+            continue
+        if frame.empty or not {"epoch", "loss"}.issubset(frame):
+            raise ValueError(f"Missing epoch/loss history: {path}")
+        columns = [c for c in ("epoch", "loss", "binary_loss") if c in frame]
+        frame[columns] = frame[columns].apply(pd.to_numeric, errors="coerce")
+        if not np.isfinite(frame[columns].to_numpy(float)).all():
+            raise ValueError(f"Nonfinite history: {path}")
+        if not np.equal(frame.epoch, np.floor(frame.epoch)).all() or (frame.epoch < 1).any():
+            raise ValueError(f"Invalid epoch values: {path}")
+    if val is not None and (val.epoch.duplicated().any() or not set(val.epoch).issubset(set(train.epoch))):
+        raise ValueError("Validation epochs must be unique and belong to this training history.")
+    columns = [c for c in ("loss", "binary_loss") if c in train]
+    grouped = train.groupby("epoch")[columns].mean().add_prefix("train_")
+    grouped["recorded_minibatches"] = train.groupby("epoch").size()
+    if val is None:
+        return grouped, len(train)
+    columns = [c for c in ("loss", "binary_loss") if c in val]
+    return grouped.join(val.set_index("epoch")[columns].add_prefix("val_")), len(train)
+
+
+def make_losses(args):
+    plt = pyplot()
+    out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
+    histories = []
+    for gender in ("F", "M"):
+        name = f"{args.platform.upper()}_SCANONLY_ANYPLAQ_{gender}_{args.old_run_tag}_seed42"
+        metrics = args.checkpoints_dir/name/"metrics"
+        candidates = sorted(metrics.glob("train_metrics_*.csv"))
+        if not candidates:
+            histories.append({"run": name, "status": "missing", "reason": "No train_metrics_*.csv files."})
+        for train_path in candidates:
+            timestamp = train_path.stem.removeprefix("train_metrics_")
+            val_path = metrics/f"val_metrics_{timestamp}.csv"
+            info = {"run": name, "timestamp": timestamp, "status": "missing_validation"}
+            if train_path.is_file():
+                try:
+                    frame, batches = epoch_history(train_path, val_path)
+                    stem = out/f"{name}_{timestamp}"
+                    frame.to_csv(str(stem)+"_epoch_metrics.csv")
+                    for key, label in (("loss", "Total training objective"), ("binary_loss", "Binary auxiliary loss (BCE)")):
+                        if f"train_{key}" not in frame:
+                            continue
+                        fig, ax = plt.subplots(figsize=(8.5, 4.8))
+                        ax.plot(frame.index, frame[f"train_{key}"], color=COLORS[gender], label="Training (mean of recorded minibatches)")
+                        if f"val_{key}" in frame:
+                            ax.plot(frame.index, frame[f"val_{key}"], color="#263C50", linestyle="--", label="Validation")
+                        ax.set(xlabel="Epoch", ylabel=label, title=f"{args.platform.title()} · {'Women' if gender == 'F' else 'Men'} · {timestamp}")
+                        style(ax); ax.legend(frameon=False, fontsize=8)
+                        note = "Saved history; no smoothing. Training and validation use different sampling modes." if val_path.is_file() else "Training history only: matching validation CSV is missing. No smoothing."
+                        fig.text(.5, .015, note, ha="center", fontsize=8)
+                        fig.tight_layout(rect=(0, .035, 1, 1)); save_plot(fig, Path(str(stem)+f"_{key}"))
+                    info.update(status="plotted" if val_path.is_file() else "plotted_training_only", epochs=len(frame), last_epoch=int(frame.index.max()), recorded_minibatches=batches,
+                                inputs=[source(path) for path in (train_path, val_path) if path.is_file()])
+                except (OSError, ValueError, pd.errors.ParserError) as exc:
+                    info.update(status="invalid", reason=str(exc))
+            histories.append(info)
+            print(f"[{info['status'].upper()}] {name} / {timestamp}")
+    save_json(out/"loss_audit.json", {"histories": histories, "restarts": "Each timestamp is kept separate; none are silently selected or merged.",
+                                    "aggregation": "Arithmetic mean of recorded minibatch losses per epoch; validation already participant mean.",
+                                    "configured_budget": "Old scans-only scripts request 500 + 1500 = 2000 epochs; plotted history may be shorter."})
+    print(f"[OUT] {out.resolve()}")
+    return histories
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=["losses", "auc"])
+    parser.add_argument("--platform", choices=list(ROOTS), default="gefion")
+    parser.add_argument("--checkpoints-dir", type=Path)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--old-run-tag", default="paper_v1")
+    parser.add_argument("--next-run-tag", default="next_v1")
+    parser.add_argument("--bootstraps", type=int, default=5000)
+    args = parser.parse_args(argv)
+    if args.bootstraps < 100:
+        parser.error("--bootstraps must be at least 100")
+    args.checkpoints_dir = args.checkpoints_dir or ROOTS[args.platform]
+    args.output_dir = args.output_dir or Path("requested_figures")/args.platform
+    return make_losses(args) if args.action == "losses" else make_auc(args)
+
+
+if __name__ == "__main__":
+    main()
+FIGURE_PYTHON
+if "$STUDY_PYTHON" paper_analysis/make_requested_figures.py losses --platform "$PLATFORM"; then
+    echo "Loss history audit finished; check loss_audit.json for missing histories."
+else
+    echo "Loss plotting failed. Continuing to the independent AUC step." >&2
+fi
+if [[ "$PLATFORM" == gefion ]]; then
+    if "$STUDY_PYTHON" paper_analysis/make_requested_figures.py auc --platform gefion; then
+        echo "AUC export finished; check auc_audit.json for the cohort comparison."
+    else
+        echo "AUC export failed; the error above identifies the required input." >&2
+    fi
+fi
+if [[ -d "requested_figures/$PLATFORM" ]]; then
+    echo "Figure files: $PWD/requested_figures/$PLATFORM"
+    find "requested_figures/$PLATFORM" -maxdepth 1 -type f \( -name '*.png' -o -name '*.pdf' \) -print
+fi
+)

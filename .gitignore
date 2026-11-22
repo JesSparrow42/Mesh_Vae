@@ -1,0 +1,32 @@
+
+# Local environments, dependencies, data, and temporary files
+.git/
+__pycache__/
+.venv*/
+venv/
+test_offline_env/
+site-packages/
+*wheelhouse*/
+offline_pkgs_linux/
+data/
+checkpoints/
+.codex_tmp/
+.chart-data-*/
+.presentation_*/
+analysis_build/
+
+# Credentials
+.env*
+tokens.txt
+*.pem
+*.key
+
+# Models and archives
+*.pth
+*.pt
+*.ckpt
+*.npz
+*.npy
+*.zip
+*.whl
+*.tar.gz

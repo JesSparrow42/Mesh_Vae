@@ -1,0 +1,3 @@
+umap-learn
+pyrender
+pynndescent PyOpenGL freetype-py

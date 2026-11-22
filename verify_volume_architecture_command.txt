@@ -1,0 +1,34 @@
+cd /data/projects/3D_scans/ML/MQVAE_new
+PY=/dpreact/home/jonsve/envs/mqvae_py312_cu121/bin/python
+RUN=/data/projects/3D_scans/ML/MQVAE_new/checkpoints/COMPUTEROME_NEXT_weight_regression_age_weight_M_next_v1_seed42
+
+"$PY" - "$RUN" <<'PY'
+from pathlib import Path
+import json
+import sys
+import torch
+
+run = Path(sys.argv[1])
+if not (run / "best_vae_net.pth").is_file() or not (run / "cond_stats.json").is_file():
+    raise SystemExit("Saved checkpoint or conditioning statistics missing: " + str(run))
+stats = json.loads((run / "cond_stats.json").read_text())
+keys = [
+    "input_nc", "ncf", "latent_dim", "latent_prior", "prior_match_mode",
+    "encoder_arch", "encoder_max_points", "mesh_use_knn", "mesh_knn_k",
+    "point_label_regions", "point_label_pooling", "scan_geometry_feature_dim",
+    "cond_names", "cond_weight", "demo_cond_dim", "encoder_cond_mode",
+    "aux_regression_col", "aux_regression_transform", "aux_regression_loss",
+    "aux_regression_dropout", "aux_regression_mean", "aux_regression_std",
+]
+report = {"run": str(run), "saved_settings": {key: stats.get(key, "NOT SAVED") for key in keys}}
+state = torch.load(run / "best_vae_net.pth", map_location="cpu", weights_only=True)
+prefixes = (
+    "encoder.input_proj", "encoder.blocks", "encoder.cond_proj", "encoder.latent_",
+    "regression_head", "decoder.cond_proj", "decoder.fold1", "decoder.fold2",
+)
+report["matrix_shapes"] = {
+    key: list(value.shape) for key, value in state.items()
+    if key.startswith(prefixes) and value.ndim == 2
+}
+print(json.dumps(report, indent=2))
+PY
