@@ -1,5 +1,7 @@
 # Total plaque-volume regression
 
+Run the commands in this guide from the repository root.
+
 The continuous target is derived for each participant as:
 
 ```text

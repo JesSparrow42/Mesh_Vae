@@ -1,5 +1,7 @@
 # 15-Model Body-Scan Comparison
 
+Run the commands in this guide from the repository root.
+
 `run_all_15_models.py` is the main experiment runner. It uses the same body-scan
 NPZ and metadata splits for every trainable row, resumes completed work, and
 writes one partial/final comparison table.

@@ -76,7 +76,7 @@ The primary outcome is plaque at any measured vascular site. Secondary binary ou
 
 ### Scan preprocessing
 
-Full-body point clouds were simplified, padded, and accompanied by scan-geometry features. Anatomical point labels divided the scan into six regions. The processing workflow and all exclusions should be described from `gefion_preprocess.sh`, `build_scan_geometry_features.py`, and the generated audit CSV rather than reconstructed from memory.
+Full-body point clouds were simplified, padded, and accompanied by scan-geometry features. Anatomical point labels divided the scan into six regions. The processing workflow and all exclusions should be described from `scripts/gefion/gefion_preprocess.sh`, `build_scan_geometry_features.py`, and the generated audit CSV rather than reconstructed from memory.
 
 ### MeshVAE representation
 

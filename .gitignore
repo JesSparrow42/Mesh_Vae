@@ -2,6 +2,8 @@
 # Local environments, dependencies, data, and temporary files
 .git/
 __pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
 .venv*/
 venv/
 test_offline_env/

@@ -1,5 +1,7 @@
 # Clinical feature sanity-check patch
 
+Run the commands in this guide from the repository root.
+
 This patch keeps the old command entry points and adds one switch:
 
 ```bash

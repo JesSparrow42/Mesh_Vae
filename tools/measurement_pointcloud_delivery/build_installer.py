@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib
 
-root = Path(__file__).resolve().parent.parent
+root = Path(__file__).resolve().parents[2]
 source = root / 'run_body_measurements_pointcloud.py'
 contents = source.read_text(encoding='utf-8').replace('\r\n', '\n')
 if not contents.endswith('\n'):
@@ -42,7 +42,8 @@ BODY_POINTCLOUD_VERIFY_20261014
 "$PY" run_body_measurements_pointcloud.py --help
 )
 '''.replace('__DIGEST__', digest)
-destination = root / 'computerome_measurement_pointcloud_setup.sh'
+destination = root / 'scripts' / 'computerome' / 'computerome_measurement_pointcloud_setup.sh'
+destination.parent.mkdir(parents=True, exist_ok=True)
 destination.write_text(header + contents + trailer, encoding='utf-8', newline='\n')
 print(destination)
 print('Code SHA256:', digest)

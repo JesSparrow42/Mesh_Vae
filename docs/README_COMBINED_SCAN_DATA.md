@@ -1,5 +1,7 @@
 # Combined Scan Data
 
+Run the commands in this guide from the repository root.
+
 The preprocessor can build one combined `simplified_padded_tensors.npz` from:
 
 - the old preprocessed NPZ, and

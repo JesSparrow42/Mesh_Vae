@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib
 
-root = Path(__file__).resolve().parents[1]
+root = Path(__file__).resolve().parents[2]
 source = (root / "train_body_measurements_expanded.py").read_text(encoding="utf-8").replace("\r\n", "\n")
 source = source.rstrip() + "\n"
 digest = hashlib.sha256(source.encode()).hexdigest()
@@ -38,7 +38,8 @@ EXPANDED_MEASUREMENTS_VERIFY_20261027
 "$PY" train_body_measurements_expanded.py --help
 )
 '''
-path = root / "computerome_train_measurement_expanded_setup.sh"
+path = root / "scripts" / "computerome" / "computerome_train_measurement_expanded_setup.sh"
+path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(header + source + trailer, encoding="utf-8", newline="\n")
 print(path)
 print("Source SHA256:", digest)

@@ -1,5 +1,7 @@
 # Physical-scale scan fix
 
+Run the commands in this guide from the repository root.
+
 ## What was wrong
 
 The old preprocessing centered every participant and divided that participant

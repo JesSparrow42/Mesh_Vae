@@ -249,7 +249,7 @@ def fit_one_model(
     except ImportError as error:
         raise ImportError(
             "run_modality_benchmark.py requires scikit-learn. On Gefion it is provided by the "
-            "working module stack used by gefion_train_long.sh."
+            "working module stack used by scripts/gefion/gefion_train_long.sh."
         ) from error
 
     x_train = feature_matrix(train, model, latent_cols, pooled)

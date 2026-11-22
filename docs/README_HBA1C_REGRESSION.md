@@ -1,5 +1,7 @@
 # HbA1c Regression
 
+Run the commands in this guide from the repository root.
+
 `run_all_15_hba1c_models.py` repeats the 15-row experiment design with
 `glycohemoglobin_hba1c` as a continuous outcome. It does not turn HbA1c into an
 arbitrary binary class. Results therefore use R-squared, MAE, RMSE, Pearson

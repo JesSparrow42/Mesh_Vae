@@ -14,7 +14,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 from build_scan_geometry_features import FEATURE_NAMES, parse_obj_vertices
 from run_body_measurements import fingerprint
@@ -103,5 +103,5 @@ with tempfile.TemporaryDirectory(prefix="measurement_expansion_") as tmp:
                "fixed_test_scans": 8, "same_person_separation": True,
                "duplicate_and_unlabelled_exclusion": True, "original_sources_and_files_preserved": True,
                "actual_baseline_cache_and_one_epoch_pointcloud_training": True}
-    (REPO / ".measurement_expansion_delivery" / "smoke_result.json").write_text(json.dumps(receipt, indent=2))
+    Path(__file__).with_name("smoke_result.json").write_text(json.dumps(receipt, indent=2))
     print("[SMOKE PASSED]", json.dumps(receipt))

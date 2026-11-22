@@ -1,5 +1,7 @@
 # Cardiovascular target benchmark
 
+Run the commands in this guide from the repository root.
+
 `run_cardiovascular_target_benchmark.py` preserves the existing female
 train/test participant split, enriches those rows from the newer master
 metadata TSV, audits every target, and runs the same two architectures for
@@ -83,7 +85,7 @@ directory. Enriched copies of the unchanged participant split are kept under
 
 ## Latent body-measurement R2
 
-The final cell in `tsne_plaque_latent.ipynb` fits Ridge regressions to the
+The final cell in [`notebooks/tsne_plaque_latent.ipynb`](../notebooks/tsne_plaque_latent.ipynb) fits Ridge regressions to the
 original scan-only latent dimensions using training participants only. It
 reports cross-validated training R2 and one held-out test R2 for BMI, waist,
 hip, height, weight, and waist-to-hip ratio. It does not regress on the two

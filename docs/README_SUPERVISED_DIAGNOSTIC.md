@@ -1,5 +1,7 @@
 # Supervised Diagnostic Model
 
+Run the commands in this guide from the repository root.
+
 This is the fresh direct classifier path. It predicts the binary
 atherosclerosis target directly from either body-scan point clouds or
 LDL/HBA1C sanity-check features.

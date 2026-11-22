@@ -1,11 +1,13 @@
 # Predicting manual body measurements from scans
 
+Run the commands in this guide from the repository root.
+
 ## Your validation cohort
 
 Your screenshots identify original OBJ files under
 `/data/preprocessed/3D_scans` and labels in
 `/data/projects/3D_scans/bodyscan_variables_for_validation_n1715.csv`.
-The [configured targets](body_measurements/targets.validation_n1715.json)
+The [configured targets](../body_measurements/targets.validation_n1715.json)
 map the 17 pictured measurements to the 17 exact `*_cm_3d` headers visible in
 that CSV. The leading unnamed column contains sequence numbers (`1`, `2`, …),
 **not OBJ scan IDs**. Never pair these labels to OBJs by alphabetical file order.
@@ -328,7 +330,7 @@ validation comparison, not a guarantee of lower test error. Test labels do not
 choose the checkpoint or the residual weights.
 
 On Computerome, first paste the contents of
-`computerome_measurement_pointcloud_setup.sh` into the terminal. That installs
+[`scripts/computerome/computerome_measurement_pointcloud_setup.sh`](../scripts/computerome/computerome_measurement_pointcloud_setup.sh) into the terminal. That installs
 only the new Python script in `MQVAE_new`, without an archive or dependency
 installation. Then run:
 
@@ -403,7 +405,7 @@ checkpoint is required.
 
 `train_body_measurements_expanded.py` orchestrates the existing feature builder,
 baseline trainer and point-cloud trainer for a larger OBJ collection. Paste the
-contents of `computerome_train_measurement_expanded_setup.sh` into Computerome,
+contents of [`scripts/computerome/computerome_train_measurement_expanded_setup.sh`](../scripts/computerome/computerome_train_measurement_expanded_setup.sh) into Computerome,
 then run:
 
 ```bash

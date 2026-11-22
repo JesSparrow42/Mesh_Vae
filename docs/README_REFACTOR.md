@@ -1,5 +1,7 @@
 # MeshVAE refactor with conditional age + adversarial age loss
 
+Run the commands in this guide from the repository root.
+
 This folder keeps the old command names (`train_mesh_vae.py`, `mesh_vae.py`, `mesh_geom_pipeline.py`, `diagnose_mesh_vae.py`) but moves most helper code into the `meshvae/` package.
 
 ## Main changes
